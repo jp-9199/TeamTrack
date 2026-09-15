@@ -1,0 +1,23 @@
+{
+  "name": "@teamtrack/api-client",
+  "version": "0.1.0",
+  "description": "Foundational API client interfaces and configuration for TeamTrack",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "tsx --test tests/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@teamtrack/shared-types": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

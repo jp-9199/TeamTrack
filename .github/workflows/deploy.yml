@@ -1,0 +1,89 @@
+name: Deploy Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  verify:
+    name: Verify Before Deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Typecheck
+        run: npm run typecheck
+
+      - name: Run Tests
+        run: npm run test
+
+      - name: Build Packages & Apps
+        run: npm run build
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: verify
+    environment: production
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Deployment Configuration
+        run: |
+          if [ -z "${{ secrets.DEPLOY_TARGET }}" ]; then
+            echo "DEPLOYMENT NOT CONFIGURED: Target provider/host is not configured."
+            echo "Deployment halted safely before any destructive actions."
+            exit 0
+          fi
+          echo "Proceeding with deployment to ${{ secrets.DEPLOY_TARGET }}..."
+
+      - name: Setup Node.js (for migration runner)
+        if: env.DEPLOY_TARGET != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Run Database Migrations
+        if: env.DEPLOY_TARGET != ''
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: PRODUCTION_DATABASE_URL secret is required for deployment."
+            exit 1
+          fi
+          npm ci --omit=dev
+          npm run --workspace=@teamtrack/backend migrate
+
+      - name: Build & Push Docker Images
+        if: env.DEPLOY_TARGET != ''
+        run: |
+          echo "This step would build and push images to a registry like ECR/GHCR"
+          # docker build -f infrastructure/backend.Dockerfile -t my-registry/backend:latest .
+          # docker push my-registry/backend:latest
+
+      - name: Trigger Provider Deployment
+        if: env.DEPLOY_TARGET != ''
+        run: |
+          echo "This step would trigger the deployment update (e.g. ECS force new deployment, CapRover webhook, etc)"
+          
+      - name: Readiness Check
+        if: env.DEPLOY_TARGET != ''
+        run: |
+          echo "Waiting for /ready endpoint to return 200..."
+          # curl --retry 5 --retry-delay 10 --fail https://${{ secrets.PRODUCTION_DOMAIN }}/api/v1/ready

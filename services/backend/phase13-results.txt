@@ -1,0 +1,1272 @@
+﻿
+> @teamtrack/backend@0.1.0 test
+> tsx --test tests/**/*.test.ts tests/phase13.governance.test.ts tests/phase13.organization-admin.test.ts tests/phase13.users.test.ts
+
+Γû╢ Phase 12: AI Assistant & AI Workspace Security Audit & Test Suite
+  Γ£ö 1. verifies migration file exists, is transactional, and creates hashed token schema (7.0263ms)
+  Γ£û Scenario A & AH: verifies unauthenticated request and caller-supplied organizationId spoofing (33.3607ms)
+  Γ£û Scenario B: cross-tenant search through AI is strictly blocked (13.9836ms)
+  Γ£ö Scenario C & D: private channel and direct conversation context leakage is blocked (2.9622ms)
+  Γ£ö Scenario E, F, G: unauthorized calendar, meeting, and file access are denied (1.8973ms)
+  Γ£ö Scenario H, I, J: unauthorized write tool invocations are rejected prior to execution (0.979ms)
+  Γ£û Scenario K & L: unknown tools and malformed tool arguments are safely rejected (5.5195ms)
+  Γ£û Scenario M, N, O: adversarial prompt injections are encapsulated as passive data and not executed (4.2463ms)
+  Γ£û Scenario P, Q, AK, AL: action confirmation requires explicit token, prevents replay, and hashes token (4.5764ms)
+  Γ£û Scenario AM & AN: re-checks authorization at confirmation time and blocks execution if access revoked (3.9335ms)
+  Γ£û Scenario AO: expired action proposals cannot be executed (25.0839ms)
+  Γ£û Scenario AP: atomic claim prevents race conditions on concurrent double confirmation (4.8364ms)
+  Γ£û Scenario AQ & AR: Bob cannot confirm Alice action proposal (Anti-IDOR) (12.0502ms)
+  Γ£û Scenario R: tool-loop exhaustion terminates safely when limit reached (10.5687ms)
+  Γ£ö Scenario S & T: rate limiter enforces user limits and concurrency (1.8358ms)
+  Γ£û Scenario U & V: provider timeout and failure are handled safely (4.641ms)
+[AI RateLimiter] Redis unavailable in production! Failing closed.
+  Γ£û Scenario X & Y: SQL injection and XSS attempts are treated as plain text (10.3563ms)
+  Γ£ö Scenario AX: mark_notification_read enforces user ownership (1.2747ms)
+  Γ£ö Scenario AY: Redis failure in production mode fails closed with 503 (1.0683ms)
+  Γ£û Scenario AF & AG: AI prompts for missing time or ambiguous user rather than guessing (7.9481ms)
+Γ£û Phase 12: AI Assistant & AI Workspace Security Audit & Test Suite (169.6816ms)
+Γû╢ Centralized Authorization & Hierarchy Resolution (Anti-IDOR)
+  Γû╢ Organization Authorization
+    Γ£ö identifies owner with full privileges (5.7205ms)
+    Γ£ö identifies admin with operational privileges (0.4391ms)
+    Γ£ö identifies guest with restricted privileges (0.8627ms)
+    Γ£ö Anti-IDOR: rejects user from foreign organization (treats as not found) (0.3485ms)
+    Γ£ö Anti-IDOR: rejects non-existent organization (12.1452ms)
+  Γ£ö Organization Authorization (28.2848ms)
+  Γû╢ Team Authorization & Anti-Enumeration
+    Γ£ö allows team member to access public team (4.7653ms)
+    Γ£ö allows team lead with isLead = true (1.2484ms)
+    Γ£ö Anti-Enumeration: hides private team from non-members (returns teamExists = false for 404) (1.4953ms)
+    Γ£ö allows org owner to access private team even if not explicitly listed (4.0924ms)
+    Γ£ö Anti-IDOR: hides team completely from foreign organization user (1.0282ms)
+  Γ£ö Team Authorization & Anti-Enumeration (14.0324ms)
+  Γû╢ Channel Authorization & Private Channel Isolation
+    Γ£ö allows active team member to access public channel (1.5272ms)
+    Γ£ö allows explicit member to access private channel (0.6106ms)
+    Γ£ö Anti-Enumeration: hides private channel from team member who is not a channel member (0.3378ms)
+    Γ£ö allows team lead or org admin to access private channel (1.5853ms)
+    Γ£ö Anti-IDOR: cross-tenant user accessing channel gets 404 NOT_FOUND (0.321ms)
+  Γ£ö Channel Authorization & Private Channel Isolation (4.7889ms)
+Γ£ö Centralized Authorization & Hierarchy Resolution (Anti-IDOR) (49.4404ms)
+Γû╢ Phase 10: Calendar & Scheduling System
+  Γû╢ Database Schema & Migration
+    Γ£ö verifies chronological migration file exists for Phase 10 (4.5268ms)
+  Γ£ö Database Schema & Migration (6.5343ms)
+  Γû╢ Input Validation & Constraints
+    Γ£ö Audit O: rejects invalid IANA timezone string (120.7512ms)
+    Γ£ö Audit P: validates RRULE and rejects malformed or unsafe recurrence (7.635ms)
+    Γ£ö Audit Q: bounds pathological recurrence COUNT and query windows (5.099ms)
+    Γ£ö Audit M & N: safely accepts strings with potential XSS / SQLi payloads without erroring validation (1.5114ms)
+    Γ£ö enforces event chronology (end must be after start for non-all-day) (0.4796ms)
+  Γ£ö Input Validation & Constraints (140.0736ms)
+  Γû╢ Security Audits & Authorization Boundary
+    Γ£ö Audit A & L: User cannot access another organization's calendar (cross-tenant anti-IDOR returns 404/403) (4.9083ms)
+    Γ£ö Audit B: Private event is strictly hidden from non-attendee (returns 404) (1.2198ms)
+    Γ£ö Audit C: Organization event is visible only to active organization members (1.2545ms)
+    Γ£ö Audit D: Team event is visible only to authorized team members (0.8765ms)
+    Γ£ö Audit F: Removed organization member loses access immediately (0.5163ms)
+    Γ£ö Audit G: Attendee can respond but cannot perform unauthorized organizer actions (1.6247ms)
+    Γ£ö Audit I & J: Meeting-linked event cannot bypass meeting authorization and private link is never leaked (0.5425ms)
+    Γ£ö Audit K: Private event details are not exposed through availability / conflict queries (0.6068ms)
+    Γ£ö Audit R: Duplicate create retry does not create duplicate event (83.3192ms)
+    Γ£ö Audit T: Deleted events are excluded from queries and return 404 (0.6693ms)
+    Γ£ö Audit X: Reminders are processed idempotently and duplicate notifications are prevented (1.6609ms)
+  Γ£ö Security Audits & Authorization Boundary (98.3335ms)
+  Γû╢ Virtual Recurrence Expansion
+    Γ£ö virtually expands daily and weekly recurring events within bounded query window without database multiplication (1.0958ms)
+  Γ£ö Virtual Recurrence Expansion (1.2687ms)
+Γ£ö Phase 10: Calendar & Scheduling System (248.778ms)
+Γû╢ Channel Lifecycle, General Protection, Private Channel Isolation & Invariants
+  Γû╢ Default "General" Channel Invariant Protection
+    Γ£ö blocks renaming the default "general" channel (CANNOT_MODIFY_GENERAL) (3.3668ms)
+    Γ£ö blocks archiving the default "general" channel (CANNOT_ARCHIVE_GENERAL) (0.6971ms)
+  Γ£ö Default "General" Channel Invariant Protection (5.4846ms)
+  Γû╢ Private Channel Membership Management Restrictions
+    Γ£ö prohibits ordinary private channel members from adding other members (1.7458ms)
+    Γ£ö allows team lead or org admin to add members to private channels (8.9257ms)
+    Γ£ö allows an ordinary private channel member to leave voluntarily (1.0218ms)
+  Γ£ö Private Channel Membership Management Restrictions (12.477ms)
+  Γû╢ Anti-Phantom Channel Membership Invariant
+    Γ£ö rejects adding a user to private channel if user is not in parent team (USER_NOT_IN_TEAM) (2.3018ms)
+  Γ£ö Anti-Phantom Channel Membership Invariant (9.499ms)
+  Γû╢ Case-Insensitive Channel Name Uniqueness
+    Γ£ö rejects duplicate channel name differing only in case within same team (1.5523ms)
+  Γ£ö Case-Insensitive Channel Name Uniqueness (1.8906ms)
+Γ£ö Channel Lifecycle, General Protection, Private Channel Isolation & Invariants (30.6694ms)
+Γû╢ Phase 6: Direct & Group Conversations
+  Γû╢ Direct Conversation Lifecycle & Deduplication
+    Γ£ö creates a direct conversation with deterministic direct_hash (7.3842ms)
+    Γ£ö returns existing direct conversation when same pair creates again (deduplication) (1.2096ms)
+    Γ£ö rejects cross-organization direct conversation (INVALID_PARTICIPANTS) (13.3992ms)
+  Γ£ö Direct Conversation Lifecycle & Deduplication (23.6062ms)
+  Γû╢ Group Conversation Lifecycle
+    Γ£ö creates group conversation with >=3 participants (14.2025ms)
+    Γ£ö rejects group conversation with fewer than 3 participants (2.3128ms)
+  Γ£ö Group Conversation Lifecycle (19.5157ms)
+  Γû╢ Conversation Messaging & Multi-Device Sync
+    Γ£ö sends message in conversation and publishes to conversation topic (1.4786ms)
+    Γ£ö rejects sending conversation message if sender is not a member (404 NOT_FOUND) (0.4438ms)
+  Γ£ö Conversation Messaging & Multi-Device Sync (2.2923ms)
+Γ£ö Phase 6: Direct & Group Conversations (46.7153ms)
+Γû╢ Phase 9D-C: Email Notifications Architecture & Delivery Outbox
+  Γû╢ Migration Verification
+    Γ£ö 1. verifies migration file exists, is transactional, and creates email delivery outbox table (5.2083ms)
+  Γ£ö Migration Verification (6.5236ms)
+  Γû╢ Email Content & Sanitization
+    Γ£ö 2. escapeHtml strictly escapes special characters (0.7516ms)
+    Γ£ö 3. renders safe email with plain text and escaped HTML (6.7598ms)
+    Γ£ö 4. formats appropriate deep links based on polymorphic resourceType (0.9184ms)
+  Γ£ö Email Content & Sanitization (8.9312ms)
+  Γû╢ Provider Abstraction
+    Γ£ö 5. SMTPEmailProvider fails fast when unconfigured without faking success (1.1702ms)
+    Γ£ö 6. SMTPEmailProvider executes custom transport in test environment (0.5577ms)
+    Γ£ö 7. SMTPEmailProvider classifies permanent vs transient errors correctly (0.6699ms)
+    Γ£ö 8. registry manages provider instances and allows overrides (0.3652ms)
+  Γ£ö Provider Abstraction (6.0574ms)
+  Γû╢ Validation & Types
+    Γ£ö 9. validateEmailDeliveryStatus correctly validates enum values (0.3892ms)
+  Γ£ö Validation & Types (0.5613ms)
+  Γû╢ Comprehensive Audit Scenarios (A - AD)
+    Γ£ö Audit A: eligible notification creates email delivery outbox row (2.6942ms)
+    Γ£ö Audit B: global email_enabled = false suppresses email outbox creation (0.445ms)
+    Γ£ö Audit C: type preference override email_enabled = false suppresses delivery (0.3148ms)
+    Γ£ö Audit D: type preference null inherits global setting (0.4224ms)
+    Γ£ö Audit E: active channel mute suppresses channel email delivery (0.4427ms)
+    Γ£ö Audit F: expired channel mute allows email delivery (0.4472ms)
+    Γ£ö Audit G: direct message or meeting invite is unaffected by active channel mutes (0.6041ms)
+    Γ£ö Audit H: user without usable email or with status != active is never enqueued (0.4762ms)
+    Γ£ö Audit I: recipient is derived authoritatively from database, not client parameters (0.5221ms)
+    Γ£ö Audit J & K: duplicate notification/recipient is idempotent via unique constraint (0.4336ms)
+    Γ£ö Audit L: provider success marks delivery SENT with provider message id (6.0304ms)
+    Γ£ö Audit M: transient provider error schedules retry with exponential backoff (0.7413ms)
+    Γ£ö Audit N: permanent provider error (invalid address) disables delivery row immediately (0.5529ms)
+    Γ£ö Audit O: maximum attempt count is enforced and marks job FAILED (21.8906ms)
+    Γ£ö Audit P: stale PROCESSING job past lease_expires_at is automatically claimable (1.5667ms)
+    Γ£ö Audit Q: concurrent worker queries with SKIP LOCKED return disjoint job sets (0.3121ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PushDeviceRepository.findActiveDevicesByUserId (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\push-device.repository.ts:155:17)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:50:21)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\email-notifications.test.ts:805:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async EmailDeliveryRepository.createDelivery (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\email-delivery.repository.ts:68:17)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\email-notifications.test.ts:805:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+    Γ£ö Audit R & S: provider unavailability does not fail notification creation and provider calls execute outside DB transaction (142.2747ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PushDeviceRepository.findActiveDevicesByUserId (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\push-device.repository.ts:155:17)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:50:21)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\email-notifications.test.ts:845:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async EmailDeliveryRepository.createDelivery (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\email-delivery.repository.ts:68:17)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\email-notifications.test.ts:845:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+    Γ£ö Audit T: email outbox creation, worker claiming, and sending never modify mutation_seq (47.9534ms)
+    Γ£ö Audit U, V, W: Phase 9C realtime sync, 9D-A preferences, and 9D-B push operate simultaneously without interference (4.8659ms)
+    Γ£ö Audit X & Y: HTML content is strictly escaped and email payload contains zero tokens or secrets (0.4437ms)
+    Γ£ö Audit Z: provider credentials are never serialized or exposed to clients (0.3126ms)
+    Γ£ö Audit AA: delivery marked SENT cannot be re-enqueued for the same notification and recipient (5.545ms)
+    Γ£ö Audit AB: email address snapshot preserves address at enqueue time regardless of future profile changes (0.8709ms)
+    Γ£ö Audit AC: crashed worker leaves job in PROCESSING until lease expires, then second worker claims it (0.3536ms)
+    Γ£ö Audit AD: deterministic reconciliation discovers and recovers orphaned notifications without email outbox rows (0.9921ms)
+  Γ£ö Comprehensive Audit Scenarios (A - AD) (247.6643ms)
+Γ£ö Phase 9D-C: Email Notifications Architecture & Delivery Outbox (271.0518ms)
+Γû╢ Phase 8A: Database Static Validation
+  Γ£ö verifies migration 13 file exists and follows correct chronological naming (14.3815ms)
+  Γ£ö verifies migration 13 is strictly transactional (BEGIN ... COMMIT) (3.1572ms)
+  Γ£ö verifies migration 13 adds status column and safely migrates existing rows to ready (1.8027ms)
+  Γ£ö verifies migration 13 adds upload_expires_at, updated_at, trigger, and expiry index (1.7045ms)
+  Γ£ö confirms previous migrations 01-12 remain untouched (3.1706ms)
+Γ£ö Phase 8A: Database Static Validation (26.4353ms)
+Γû╢ Phase 8A: Shared Validation & Security Rules
+  Γû╢ File Name Validation (validateFileName)
+    Γ£ö accepts valid, safe file names with common extensions (0.8257ms)
+    Γ£ö rejects empty or whitespace-only file names (0.4824ms)
+    Γ£ö rejects file names exceeding 255 characters (0.3915ms)
+    Γ£ö rejects path traversal attempts (../, ..\, slashes) (0.3636ms)
+    Γ£ö rejects null bytes and control characters (0.415ms)
+    Γ£ö rejects dangerous executable and script extensions (0.5557ms)
+    Γ£ö rejects case-insensitive variants of dangerous extensions (0.2409ms)
+    Γ£ö rejects multi-extension spoofing tricks containing dangerous extensions (0.263ms)
+  Γ£ö File Name Validation (validateFileName) (4.3951ms)
+  Γû╢ File Size Validation (validateFileSizeBytes)
+    Γ£ö accepts non-negative integers up to 100MB limit (0.3402ms)
+    Γ£ö rejects negative sizes and non-integers (0.1952ms)
+    Γ£ö rejects files exceeding 100MB (0.2198ms)
+  Γ£ö File Size Validation (validateFileSizeBytes) (0.9767ms)
+  Γû╢ MIME Type Validation (validateMimeType)
+    Γ£ö accepts and normalizes valid standard MIME types (0.5219ms)
+    Γ£ö normalizes uppercase and trimmed MIME types (0.1739ms)
+    Γ£ö rejects malformed or empty MIME types (0.153ms)
+    Γ£ö rejects dangerous executable MIME types (0.1466ms)
+  Γ£ö MIME Type Validation (validateMimeType) (1.9599ms)
+  Γû╢ SHA-256 Checksum Validation (validateChecksumSha256)
+    Γ£ö accepts valid 64-character hexadecimal SHA-256 checksums (0.6853ms)
+    Γ£ö accepts uppercase hex and normalizes to lowercase (0.2301ms)
+    Γ£ö allows undefined or null as optional (0.1683ms)
+    Γ£ö rejects invalid length or non-hex characters (0.1752ms)
+  Γ£ö SHA-256 Checksum Validation (validateChecksumSha256) (1.6605ms)
+  Γû╢ Upload Intent Request Validation (validateFileUploadIntent)
+    Γ£ö validates a complete, valid upload intent payload (0.3606ms)
+    Γ£ö collects multiple validation errors on invalid input (0.1638ms)
+    Γ£ö rejects non-object payloads (0.1184ms)
+  Γ£ö Upload Intent Request Validation (validateFileUploadIntent) (0.8092ms)
+  Γû╢ Message Attachment IDs Validation (validateFileAttachmentIds)
+    Γ£ö accepts an array of valid UUIDs up to limit (3.9573ms)
+    Γ£ö accepts undefined or null and defaults to empty array (0.2047ms)
+    Γ£ö rejects non-arrays and invalid UUID elements (0.1218ms)
+    Γ£ö rejects attachment count exceeding limit (> 10) (0.2953ms)
+  Γ£ö Message Attachment IDs Validation (validateFileAttachmentIds) (4.8262ms)
+Γ£ö Phase 8A: Shared Validation & Security Rules (15.3466ms)
+Γû╢ Phase 8A: Shared Types & Error Codes Contract
+  Γ£ö verifies Phase 8 error codes are defined with correct strings (0.2974ms)
+  Γ£ö verifies constants match approved architecture specification (0.1271ms)
+  Γ£ö verifies FileStatus values type contract at compile time and runtime (0.122ms)
+  Γ£ö verifies FileMetadata shape satisfies client data needs without exposing storage keys or credentials (1.3058ms)
+  Γ£ö verifies MessageAttachment extension maintains backwards compatibility with Phase 6 (0.2693ms)
+Γ£ö Phase 8A: Shared Types & Error Codes Contract (2.4247ms)
+[Storage Deletion Warning] Failed to delete physical object; soft delete remains authoritative: S3 503 Service Unavailable
+Γû╢ Phase 8C: File Repository, Service, Authorization & Messaging Integration
+  Γû╢ Canonical Storage Key Generation
+    Γ£ö generates secure canonical key with tenant isolation and random nonce (6.1452ms)
+    Γ£ö sanitizes traversal characters, slashes, and control characters in filename (0.7481ms)
+  Γ£ö Canonical Storage Key Generation (8.4813ms)
+  Γû╢ File Authorization Logic
+    Γ£ö allows upload intent creation only for active organization members (1.1292ms)
+    Γ£ö authorizes unattached file reads for uploader and org admins/owners, denying other members and cross-tenant (1.2686ms)
+    Γ£ö enforces attached resource authorization (channel message): uploader has NO permanent bypass to private channels (0.8317ms)
+    Γ£ö enforces attached conversation authorization (1.1634ms)
+    Γ£ö strictly restricts finalization to the original uploader ONLY (0.384ms)
+    Γ£ö authorizes file deletion for uploader or org admin/owner (0.5814ms)
+  Γ£ö File Authorization Logic (6.3883ms)
+  Γû╢ FileService: createUploadIntent
+    Γ£ö creates upload intent and returns presigned PUT URL with 900s TTL (3.8762ms)
+    Γ£ö rejects cross-organization upload intent with 404 NOT_FOUND (1.4487ms)
+    Γ£ö rejects invalid upload intent payloads (file > 100MB, dangerous extension) (0.8444ms)
+  Γ£ö FileService: createUploadIntent (6.4944ms)
+  Γû╢ FileService: finalizeUpload
+    Γ£ö successfully finalizes upload when remote object exists and size matches declared bytes (1.3929ms)
+    Γ£ö rejects finalize if remote object does not exist in storage (0.5216ms)
+    Γ£ö rejects finalize if object size in storage does not match declared size (0.6376ms)
+    Γ£ö rejects finalize if object content type in storage does not match declared MIME type (0.561ms)
+    Γ£ö rejects finalize if user is not the original uploader (even if org admin) (0.5198ms)
+    Γ£ö rejects finalize if upload intent has expired (0.5258ms)
+    Γ£ö rejects finalize if file is already ready (cannot finalize twice) (0.5249ms)
+  Γ£ö FileService: finalizeUpload (5.126ms)
+  Γû╢ FileService: getSignedDownloadUrl
+    Γ£ö generates short-lived presigned GET URL for authorized ready file (0.7922ms)
+    Γ£ö rejects download URL for non-ready (uploading) files (0.5055ms)
+    Γ£ö rejects download URL for soft-deleted files with 404 (0.4323ms)
+  Γ£ö FileService: getSignedDownloadUrl (2.0252ms)
+  Γû╢ FileService: deleteFile
+    Γ£ö marks database record soft-deleted and triggers remote object delete (1.1318ms)
+    Γ£ö remote storage deletion failure does NOT resurrect or fail the authoritative DB soft delete (1.8542ms)
+  Γ£ö FileService: deleteFile (3.3095ms)
+  Γû╢ Messaging Attachment Validation Integration
+    Γ£ö accepts ready attachments belonging to the same organization (1.0286ms)
+    Γ£ö rejects attachments not in ready status (e.g. uploading or failed) (0.5398ms)
+    Γ£ö rejects cross-tenant attachments without leaking existence (404 ORGANIZATION_MISMATCH) (0.5645ms)
+    Γ£ö rejects deleted file attachments with 404 FILE_NOT_FOUND (0.5251ms)
+    Γ£ö rejects message if attachment count exceeds maximum limit (10) (0.453ms)
+    Γ£ö rejects sendChannelMessage if any attachment validation fails (0.9381ms)
+  Γ£ö Messaging Attachment Validation Integration (4.6119ms)
+  Γû╢ FileService: listOrganizationFiles
+    Γ£ö returns cursor-paginated list of non-deleted ready files (1.0475ms)
+  Γ£ö FileService: listOrganizationFiles (1.1789ms)
+Γ£ö Phase 8C: File Repository, Service, Authorization & Messaging Integration (39.2723ms)
+Γû╢ Password Hashing & Timing Attack Mitigation
+  Γ£ö successfully creates an Argon2id hash with expected prefix (70.435ms)
+Γ£û tests\hasher.test.ts (678.6655ms)
+Γû╢ Phase 6: Strict Message Idempotency Semantics
+  Γ£ö FIRST REQUEST: inserts message, publishes message.created, and returns 201 (7.8382ms)
+  Γ£ö IDENTICAL RETRY: returns original message, isIdempotentRetry=true, and zero duplicate events (1.3064ms)
+  Γ£ö SAME KEY + DIFFERENT CONTENT: rejects with 409 IDEMPOTENCY_KEY_COLLISION and does NOT mutate original (3.4765ms)
+  Γ£ö CONCURRENT DUPLICATE RACE: handles PostgreSQL 23505 collision, recovers original, and emits zero duplicate events (5.8769ms)
+Γ£ö Phase 6: Strict Message Idempotency Semantics (22.0186ms)
+[low_level_alloc.cc : 554] RAW: Check new_pages != nullptr failed: VirtualAlloc failed
+Γ£û tests\meeting.authorization.test.ts (758.6096ms)
+Γû╢ Phase 7: Host Transfer & Concurrency Protection
+  Γ£ö transfers host ownership transactionally with row lock (6.722ms)
+  Γ£ö rejects transfer when transferring to oneself (21.6331ms)
+  Γ£ö rejects transfer when requested by a non-host participant (14.8854ms)
+Γ£ö Phase 7: Host Transfer & Concurrency Protection (47.316ms)
+Γû╢ Phase 7: Meeting Lifecycle & State Transitions
+  Γû╢ Meeting Creation
+    Γ£ö creates meeting with server-authoritative host identity (17.2389ms)
+  Γ£ö Meeting Creation (20.9461ms)
+  Γû╢ Start Meeting State Machine
+    Γ£ö transitions SCHEDULED -> ACTIVE and sets startedAt (2.225ms)
+    Γ£ö rejects start transition when meeting is already ACTIVE (2.4223ms)
+    Γ£ö rejects start transition when meeting is ENDED (ended cannot restart) (36.0901ms)
+  Γ£ö Start Meeting State Machine (41.9512ms)
+  Γû╢ End Meeting State Machine
+    Γ£ö transitions ACTIVE -> ENDED and sets endedAt without deleting records (1.7397ms)
+    Γ£ö rejects ending a meeting that is already ENDED (0.7517ms)
+  Γ£ö End Meeting State Machine (3.1037ms)
+  Γû╢ Leave and Rejoin Behavior
+    Γ£ö leaving updates participant status to LEFT but does NOT end meeting (1.8987ms)
+  Γ£ö Leave and Rejoin Behavior (2.1823ms)
+Γ£ö Phase 7: Meeting Lifecycle & State Transitions (70.9821ms)
+Γû╢ Phase 7: Participant Media State Controls & Event Publication
+  Γ£ö updates self media state and emits granular post-commit realtime events (6.4552ms)
+  Γ£ö rejects media state updates from participants who are in WAITING room (2.3352ms)
+Γ£ö Phase 7: Participant Media State Controls & Event Publication (11.3001ms)
+Γû╢ Phase 7: Meeting Sync & Reconnection Recovery
+  Γ£ö recovers complete meeting state and delta participant updates across reconnects (6.616ms)
+Γ£ö Phase 7: Meeting Sync & Reconnection Recovery (10.8393ms)
+Γû╢ Phase 7: Waiting Room & Participant Admission/Removal
+  Γû╢ Join & Waiting Room Admission Policy
+    Γ£ö places non-host in WAITING state when waiting room is enabled (11.5657ms)
+    Γ£ö bypasses waiting room for host (status is JOINED) (2.4784ms)
+    Γ£ö rejects removed participant from rejoining (4.8476ms)
+  Γ£ö Join & Waiting Room Admission Policy (22.6379ms)
+  Γû╢ Host Admission Controls
+    Γ£ö host admits a WAITING participant (WAITING -> ADMITTED) (3.3189ms)
+    Γ£ö rejects non-host from admitting participants (2.3363ms)
+  Γ£ö Host Admission Controls (7.8513ms)
+  Γû╢ Participant Removal Controls
+    Γ£ö host removes a participant and terminates their subscriptions (3.1345ms)
+    Γ£ö rejects attempt to remove the meeting host (1.9125ms)
+  Γ£ö Participant Removal Controls (5.8087ms)
+Γ£ö Phase 7: Waiting Room & Participant Admission/Removal (38.9911ms)
+Γû╢ Phase 7: WebRTC Signaling, Participant Isolation & Reactions
+  Γû╢ WebRTC Signaling Boundaries
+    Γ£û routes valid SDP offer between two joined participants in active meeting (107.5346ms)
+    Γ£û blocks waiting participant from sending WebRTC signaling (33.5589ms)
+    Γ£û blocks signaling targeted at participant in waiting room (8.4164ms)
+    Γ£ö rejects signaling when meeting is not ACTIVE (e.g. ENDED or SCHEDULED) (2.4074ms)
+    Γ£ö rejects signaling to oneself (1.4076ms)
+  Γ£û WebRTC Signaling Boundaries (158.3495ms)
+  Γû╢ Transient Reactions & Hand Raising
+    Γ£û publishes transient meeting reaction with server-derived sender identity (45.5359ms)
+    Γ£û updates hand state in DB and publishes realtime event (32.0578ms)
+  Γ£û Transient Reactions & Hand Raising (80.6132ms)
+Γ£û Phase 7: WebRTC Signaling, Participant Isolation & Reactions (242.3208ms)
+Γû╢ Phase 7: Meeting WebSocket Topic Authorization & Multi-Device Subscriptions
+  Γ£ö permits authorized organization member to subscribe to meeting:<meetingId> (4.088ms)
+  Γ£ö rejects cross-organization subscription attempt to meeting:<meetingId> (1.2979ms)
+  Γ£ö rejects subscription for removed participant (1.4913ms)
+  Γ£ö supports multi-device connections for the same logical participant (4.5223ms)
+Γ£ö Phase 7: Meeting WebSocket Topic Authorization & Multi-Device Subscriptions (14.5366ms)
+Γû╢ Phase 6: Messaging, Keyset Pagination, Reactions & Read State
+  Γû╢ Channel Message Creation & Authorization Boundaries
+    Γ£ö creates a channel message successfully when authorized (5.8265ms)
+    Γ£ö rejects cross-tenant message creation with 404 NOT_FOUND (anti-IDOR) (2.2541ms)
+    Γ£ö rejects parent message belonging to a different channel (PARENT_MESSAGE_TARGET_MISMATCH) (4.1222ms)
+  Γ£ö Channel Message Creation & Authorization Boundaries (25.7703ms)
+  Γû╢ Keyset Cursor Pagination
+    Γ£ö correctly encodes and decodes cursor (created_at + id) (4.4211ms)
+    Γ£ö rejects malformed or invalid base64 cursor (1.3833ms)
+    Γ£ö handles identical timestamps deterministically with id tie-breaker (1.4968ms)
+  Γ£ö Keyset Cursor Pagination (8.0284ms)
+  Γû╢ Message Edit & Soft Delete
+    Γ£ö allows author to edit message and publishes message.updated (1.3383ms)
+    Γ£ö rejects editing by non-author with 403 NOT_MESSAGE_AUTHOR (0.8035ms)
+    Γ£ö soft deletes message, clears content, and publishes message.deleted (1.3712ms)
+  Γ£ö Message Edit & Soft Delete (4.3058ms)
+  Γû╢ Reactions Validation & Aggregation
+    Γ£ö validates reaction codes correctly (Unicode emojis, shortcodes, slugs) (2.5552ms)
+    Γ£ö adds reaction and publishes reaction.added event (1.4518ms)
+    Γ£ö removes reaction and publishes reaction.removed event (1.8883ms)
+  Γ£ö Reactions Validation & Aggregation (6.339ms)
+  Γû╢ Channel Read State & Delta Synchronization
+    Γ£ö marks channel read, persists last_read_at, and broadcasts channel.read (1.9518ms)
+    Γ£ö delta synchronization discovers soft-deleted messages so clients remove them (1.5939ms)
+  Γ£ö Channel Read State & Delta Synchronization (3.8852ms)
+Γ£ö Phase 6: Messaging, Keyset Pagination, Reactions & Read State (50.3088ms)
+Γû╢ Phase 9D-A: Notification Preferences & Channel Mute Rules
+  Γ£ö 1. verifies migration file exists, is transactional, and creates required preference tables (8.4944ms)
+  Γû╢ Preference Resolution Precedence
+    Γ£ö A. Default preferences: no rows -> all defaults enabled (true) (3.7209ms)
+    Γ£ö B. Global preference update: disable push -> pushAllowed false, others remain true (1.4981ms)
+    Γ£ö C. Type override: Global push true + type push false -> pushAllowed false (1.3197ms)
+    Γ£ö D. Type inheritance: Global push false + type push NULL -> pushAllowed false (1.2824ms)
+    Γ£ö E. Explicit type enable: Global push false + type push true -> pushAllowed true (0.9354ms)
+  Γ£ö Preference Resolution Precedence (9.8418ms)
+  Γû╢ Channel Mute Semantics
+    Γ£ö F. Permanent channel mute: muted_until NULL -> actively muted (1.2685ms)
+    Γ£ö G. Temporary channel mute: future muted_until -> actively muted (1.0838ms)
+    Γ£ö H. Expired mute: past muted_until -> evaluates as unmuted without worker (0.7061ms)
+    Γ£ö I. Unmute: row removed -> unmuted (0.758ms)
+    Γ£ö Channel mute does NOT affect non-channel notifications (e.g. direct_message) (0.5563ms)
+  Γ£ö Channel Mute Semantics (5.214ms)
+  Γû╢ Authorization & Security Tests
+    Γ£ö J. Unauthorized channel mute: user without channel access -> rejected with 404 (1.9367ms)
+    Γ£ö K. Cross-tenant channel mute: anti-IDOR returns 404 (7.717ms)
+    Γ£ö L. User isolation: User A cannot read or mutate User B preferences (0.9803ms)
+  Γ£ö Authorization & Security Tests (11.0234ms)
+  Γû╢ Concurrency & Atomic UPSERTs
+    Γ£ö M. Concurrent preference updates do not cause lost updates or errors (4.0343ms)
+    Γ£ö N. Concurrent first-time preference creation is safe (5.062ms)
+  Γ£ö Concurrency & Atomic UPSERTs (14.5491ms)
+  Γû╢ Validation & Security Input Sanitization
+    Γ£ö O. Unknown notification type is strictly rejected (1.0679ms)
+    Γ£ö P. Invalid timestamp: past timestamp or malformed ISO rejected with 400 (0.9164ms)
+    Γ£ö Security: SQL injection strings in notification type are rejected (3.9855ms)
+    Γ£ö Security: Unknown fields in preference request are rejected (0.8511ms)
+    Γ£ö Security: Spoofed userId/recipientId in request body is rejected as unknown field (0.5078ms)
+  Γ£ö Validation & Security Input Sanitization (8.0244ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PushDeviceRepository.findActiveDevicesByUserId (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\push-device.repository.ts:155:17)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:50:21)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification-preferences.test.ts:585:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Promise.all (index 0)
+    at async Suite.run (node:internal/test_runner/test:1794:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+  Γû╢ Durable Notification Invariants
+    Γ£ö Q. Disabled delivery does NOT delete or suppress notification persistence in PostgreSQL (122.9325ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PushDeviceRepository.findActiveDevicesByUserId (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\push-device.repository.ts:155:17)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:50:21)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification-preferences.test.ts:624:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+    Γ£ö R. Disabled delivery does NOT modify notification mutation_seq (29.1826ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PushDeviceRepository.findActiveDevicesByUserId (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\push-device.repository.ts:155:17)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:50:21)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification-preferences.test.ts:661:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+    Γ£ö S. Channel mute does NOT modify notification read/unread state (47.1434ms)
+  Γ£ö Durable Notification Invariants (200.4799ms)
+Γ£ö Phase 9D-A: Notification Preferences & Channel Mute Rules (261.6716ms)
+Γû╢ Phase 9A: Notification Database Architecture Static Tests
+  Γ£ö 1. verifies migration 14 file exists and follows correct chronological naming (4.6502ms)
+  Γ£ö 2. verifies migration 14 is sequence 14 among all sql migrations (3.7553ms)
+  Γ£ö 3. verifies migration 14 is strictly transactional (BEGIN ... COMMIT) (4.8943ms)
+  Γ£ö 4. confirms migrations 01-13 remain strictly untouched (6.546ms)
+  Γ£ö 5. verifies existing notification indexes are inspected and retained in migration 08 (47.5062ms)
+  Γ£ö 6. verifies addition of enhancement columns (actor_id, resource_type, resource_id, grouping_key, source_event_id, deleted_at, updated_at) (49.8726ms)
+  Γ£ö 7. verifies organization_id remains nullable supporting both tenant and system notices (10.0289ms)
+  Γ£ö 8. verifies safe backfill for existing notification rows (3.2691ms)
+  Γ£ö 9. verifies trg_notifications_updated_at uses existing set_updated_at() trigger function (4.7879ms)
+  Γ£ö 10. verifies sync_notification_read_status trigger function design and non-recursion guards (7.5505ms)
+  Γ£ö 11. verifies keyset cursor indexes and multi-device sync index exist with deleted_at IS NULL predicate (4.2903ms)
+  Γ£ö 12. verifies organization, resource, and grouping indexes exist (5.406ms)
+  Γ£ö 13. verifies idempotent deduplication unique partial index includes deleted_at IS NULL (5.3283ms)
+  Γ£ö 14. verifies documentation confirms source_event_id represents stable domain event identity (6.9213ms)
+Γ£ö Phase 9A: Notification Database Architecture Static Tests (176.6961ms)
+Γû╢ Phase 9A: Trigger Logic Invariant Tests (In-Memory Simulation)
+  Γ£ö sets is_read = false and read_at = null on unread INSERT (0.8678ms)
+  Γ£ö sets is_read = true when read_at is supplied on INSERT (0.3584ms)
+  Γ£ö initializes read_at to created_at when legacy is_read = true is inserted (1.15ms)
+  Γ£ö syncs is_read to true when read_at is updated to a timestamp (0.6268ms)
+  Γ£ö syncs is_read to false when read_at is updated to null (0.3051ms)
+  Γ£ö syncs read_at when legacy is_read is updated to true (0.2578ms)
+  Γ£ö syncs read_at to null when legacy is_read is updated to false (0.255ms)
+Γ£ö Phase 9A: Trigger Logic Invariant Tests (In-Memory Simulation) (4.6891ms)
+Γû╢ Phase 9A: Shared Types & Contract Alignment Tests
+  Γ£ö validates NotificationRow persistence contract (0.484ms)
+  Γ£ö validates client Notification DTO excludes internal lifecycle fields (3.4033ms)
+  Γ£ö validates NotificationCursor and NotificationSyncCursor shapes (0.3126ms)
+  Γ£ö validates Phase 9 error codes (0.2466ms)
+Γ£ö Phase 9A: Shared Types & Contract Alignment Tests (4.9132ms)
+Γû╢ Phase 9C: Notification Realtime, Monotonic Sequence & Concurrency Verification
+  Γ£ö 1. verifies migration 15 file exists, is sequence 15, and is transactional (15.3857ms)
+  Γ£ö 2. verifies migration 15 backfill establishes deterministic bootstrap state for both active and deleted rows (9.7488ms)
+  Γ£ö 3. verifies 64-bit integer mutationSeq crosses API boundary as string and round-trips safely (3.3161ms)
+  Γ£ö 4. validateNotificationSyncQuery parses cursor and boundary parameters safely (2.0047ms)
+  Γ£ö 5. Test 1: seq 12 arrives before seq 11 -> buffered in pending queue, then both drain in order (12.6293ms)
+  Γ£ö 6. Test 2: seq 11 missing and seq 12 arrives -> gap detected without skipping (4.8138ms)
+  Γ£ö 7. Test 6: read_all arrives with unresolved sequence gap -> buffered, does not mutate cached rows prematurely (9.7984ms)
+  Γ£ö 9. Current row mutation_seq > snapshot and Redis event is missed ΓåÆ next authoritative sync cycle returns the notification in the appropriate current-state stream: active/upserted if the row is active, or deletedIds if the row is soft-deleted (2.2276ms)
+  Γ£ö 10. Test 4: update followed by delete between pages -> deletion stream purges row; row never resurrected (0.8269ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.realtime.test.ts:541:21)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.realtime.test.ts:541:21)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+  Γ£ö 11. verifies NotificationService mutation paths publish realtime events with mutationSeq post-commit (171.4051ms)
+  Γ£ö 12. verifies SubscriptionManager strictly isolates user topics preventing cross-user eavesdropping (2.3549ms)
+  Γû╢ Issue 1: Mutation Sequence Gap Prevention
+    Γ£ö A. duplicate createNotification does not consume a sequence (seq 1 -> duplicate returns seq 1 -> next create gets seq 2) (12.8777ms)
+    Γ£ö B. already-read markRead does not create a committed unused sequence (1.821ms)
+    Γ£ö C. already-unread markUnread does not create a committed unused sequence (0.9599ms)
+    Γ£ö D. already-deleted delete does not create a committed unused sequence (18.4742ms)
+    Γ£ö E. not-found mutation does not create a committed unused sequence (14.8539ms)
+    Γ£ö F. concurrent successful mutations still receive strictly ordered contiguous sequences (0.9054ms)
+    Γ£ö G. concurrent first-time user_notification_state creation still safely produces seq 1 and seq 2 (5.5526ms)
+  Γ£ö Issue 1: Mutation Sequence Gap Prevention (56.4496ms)
+  Γû╢ Issue 2: Authoritative read_all Timestamp
+    Γ£ö 1 & 3. markAllNotificationsRead publishes event with authoritative readAt and all affected rows receive identical readAt (1.1578ms)
+    Γ£ö 5 & 6. markAllNotificationsRead with 0 unread notifications is a no-op and does not publish an event or consume sequence (0.6264ms)
+  Γ£ö Issue 2: Authoritative read_all Timestamp (2.0516ms)
+Γ£ö Phase 9C: Notification Realtime, Monotonic Sequence & Concurrency Verification (300.1369ms)
+Γû╢ Phase 9B: Notification Repository, Service, Authorization & API Client
+  Γû╢ Notification Repository & DTO Field Boundary
+    Γ£ö mapNotification explicitly omits internal persistence fields (is_read, deleted_at, source_event_id, grouping_key) (10.5899ms)
+    Γ£ö createNotification executes INSERT ... ON CONFLICT DO NOTHING with fallback SELECT on conflict (2.1691ms)
+    Γ£ö createNotification without conflict returns the newly created row directly (1.2753ms)
+    Γ£ö keyset cursor encodes and decodes created_at + id accurately (7.2211ms)
+    Γ£ö decodeNotificationCursor returns invalid result for malformed cursors (2.5628ms)
+  Γ£ö Notification Repository & DTO Field Boundary (30.059ms)
+  Γû╢ Notification Authorization & Security
+    Γ£ö canAccessNotification allows recipient for active notification (3.7254ms)
+    Γ£ö canAccessNotification denies another user (IDOR protection) (0.7626ms)
+    Γ£ö canAccessNotification denies soft-deleted notification even for recipient (0.4653ms)
+    Γ£ö canModifyNotification allows recipient for active notification (0.7119ms)
+    Γ£ö canModifyNotification denies another user and soft-deleted notification (0.6938ms)
+    Γ£ö getNotification returns 404 for another user notification with no existence leakage (8.3653ms)
+    Γ£ö markNotificationRead returns 404 for another user notification (1.1561ms)
+    Γ£ö markNotificationUnread returns 404 for another user notification (0.8719ms)
+    Γ£ö deleteNotification returns 404 for another user notification (1.7865ms)
+    Γ£ö organization filter without active membership returns 404 for unread count (1.9135ms)
+    Γ£ö organization filter without active membership returns 404 for markAllNotificationsRead (2.1607ms)
+    Γ£ö recipient spoofing is rejected (service and controller enforce authenticated user) (1.7563ms)
+    Γ£ö actor spoofing is rejected (backend validates actor existence) (5.7429ms)
+    Γ£ö resource_id does NOT grant access to notification or bypass recipient authority (0.9676ms)
+    Γ£ö confirms router does NOT expose a public POST /api/v1/notifications creation route (6.2172ms)
+  Γ£ö Notification Authorization & Security (51.9965ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:575:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Promise.all (index 0)
+    at async Suite.run (node:internal/test_runner/test:1794:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:575:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Promise.all (index 0)
+    at async Suite.run (node:internal/test_runner/test:1794:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+  Γû╢ Internal Creation Contract & Domain Resource Validation
+    Γ£ö validates channel resource existence and organization context (207.0639ms)
+    Γ£ö validates team resource existence and organization context (1.1369ms)
+    Γ£ö validates meeting resource existence and organization context (2.3947ms)
+    Γ£ö validates file resource existence and organization context (0.9019ms)
+    Γ£ö validates message resource existence (4.3122ms)
+  Γ£ö Internal Creation Contract & Domain Resource Validation (220.5078ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:742:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Promise.all (index 0)
+    at async Suite.run (node:internal/test_runner/test:1794:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:742:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Promise.all (index 0)
+    at async Suite.run (node:internal/test_runner/test:1794:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:750:24)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Promise.all (index 0)
+    at async Suite.run (node:internal/test_runner/test:1794:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:750:24)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Promise.all (index 0)
+    at async Suite.run (node:internal/test_runner/test:1794:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:812:20)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:812:20)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+  Γû╢ Deduplication & Idempotency
+    Γ£ö same source event returns one active notification idempotently (64.9742ms)
+    Γ£ö concurrent duplicate creation does not produce 500 (1.815ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:820:20)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:820:20)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+    Γ£ö different source_event_id values create separate notifications (53.4817ms)
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:851:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:851:23)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async PushDeliveryService.enqueueDeliveriesForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\push\push-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:150:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:860:27)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+[NotificationService] Transactional email outbox enqueue warning: AggregateError [ECONNREFUSED]: 
+    at C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async NotificationPreferencesRepository.getGlobalPreferences (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\db\repositories\notification-preferences.repository.ts:126:17)
+    at async NotificationDeliveryPolicy.resolvePolicy (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification-delivery-policy.ts:34:23)
+    at async EmailDeliveryService.enqueueDeliveryForNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\email\email-delivery.service.ts:36:20)
+    at async NotificationService.createNotification (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\src\modules\notifications\notification.service.ts:164:9)
+    at async TestContext.<anonymous> (C:\Users\anime\.gemini\antigravity-ide\scratch\TeamTrack\services\backend\tests\notification.service.test.ts:860:27)
+    at async Test.run (node:internal/test_runner/test:1332:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:911:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 5432
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:5432
+        at createConnectionError (node:net:1747:14)
+        at afterConnectMultiple (node:net:1777:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 5432
+    }
+  ]
+}
+    Γ£ö soft-deleted notification allows re-emission with same source_event_id (41.2291ms)
+  Γ£ö Deduplication & Idempotency (163.6728ms)
+  Γû╢ Read State & Unread Management
+    Γ£ö new notification is unread (readAt is null) (0.7408ms)
+    Γ£ö markRead sets readAt (1.703ms)
+    Γ£ö markUnread clears readAt (0.813ms)
+    Γ£ö markAllRead only affects authenticated recipient (9.3056ms)
+    Γ£ö organization-scoped markAllRead only affects verified organization (4.8381ms)
+  Γ£ö Read State & Unread Management (18.3274ms)
+  Γû╢ Pagination & Keyset Cursor
+    Γ£ö listNotifications correctly computes hasMore and nextCursor based on limit boundary (1.6951ms)
+    Γ£ö listNotifications sets nextCursor to null and hasMore to false when at end of page (0.9255ms)
+  Γ£ö Pagination & Keyset Cursor (3.0736ms)
+  Γû╢ Soft Delete Invariants
+    Γ£ö deleted notification disappears from lists (0.5393ms)
+    Γ£ö deleted notification is excluded from unread count (0.5513ms)
+  Γ£ö Soft Delete Invariants (1.4174ms)
+  Γû╢ API Client Methods (All 8 Methods)
+    Γ£ö 1. listNotifications sends GET to /api/v1/notifications with query parameters (135.7313ms)
+    Γ£ö 2. listUnreadNotifications sends GET to /api/v1/notifications/unread (5.8052ms)
+    Γ£ö 3. getUnreadNotificationCount sends GET to /api/v1/notifications/unread-count with optional org (3.6659ms)
+    Γ£ö 4. getNotification sends GET to /api/v1/notifications/:id (4.4067ms)
+    Γ£ö 5. markNotificationRead sends POST to /api/v1/notifications/:id/read (2.9653ms)
+    Γ£ö 6. markNotificationUnread sends POST to /api/v1/notifications/:id/unread (1.4395ms)
+    Γ£ö 7. markAllNotificationsRead sends POST to /api/v1/notifications/read-all with body (1.6956ms)
+    Γ£ö 8. deleteNotification sends DELETE to /api/v1/notifications/:id (1.6675ms)
+    Γ£ö confirms createNotification is NOT exposed on ApiClient (0.6737ms)
+  Γ£ö API Client Methods (All 8 Methods) (159.0226ms)
+Γ£ö Phase 9B: Notification Repository, Service, Authorization & API Client (654.2207ms)
+Γû╢ Organization Lifecycle, Ownership Invariants & Cascades
+  Γû╢ Sole Owner Departure & Removal Protection
+    Γ£ö blocks the organization owner from leaving without transferring ownership (4.6843ms)
+    Γ£ö blocks an admin from removing the organization owner (1.0079ms)
+  Γ£ö Sole Owner Departure & Removal Protection (9.2133ms)
+  Γû╢ Ownership Transfer Locked Workflow
+    Γ£ö successfully transfers ownership, swaps roles, and updates owner_id in a transaction (1.6886ms)
+    Γ£ö rejects ownership transfer if caller is not current owner (1.391ms)
+    Γ£ö rejects ownership transfer if target user is not an active member (1.5095ms)
+  Γ£ö Ownership Transfer Locked Workflow (5.3124ms)
+  Γû╢ Explicit Scoped Cascade Deprovisioning
+    Γ£ö purges channel_members, team_members, and organization_members in sequence within org scope (11.2336ms)
+  Γ£ö Explicit Scoped Cascade Deprovisioning (13.909ms)
+  Γû╢ Role Management Boundaries
+    Γ£ö prevents non-owners from granting owner role via addMember (2.5739ms)
+    Γ£ö prevents admins from promoting someone to admin (1.6024ms)
+  Γ£ö Role Management Boundaries (9.3155ms)
+Γ£ö Organization Lifecycle, Ownership Invariants & Cascades (40.1986ms)

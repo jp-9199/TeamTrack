@@ -1,0 +1,90 @@
+{
+	# Global options block
+	admin off
+	
+	# Local vs Production TLS handling
+	# If CADDY_ENVIRONMENT is "local", we use internal TLS.
+	# If CADDY_ENVIRONMENT is "production", Caddy will auto-provision TLS via Let's Encrypt for the SITE_ADDRESS.
+}
+
+# The SITE_ADDRESS is passed in via environment variable (e.g., SITE_ADDRESS=app.example.com or SITE_ADDRESS=localhost:443)
+{$SITE_ADDRESS} {
+	# ---------------------------------------------------------
+	# Security Headers (Phase 15 requirement)
+	# ---------------------------------------------------------
+	header {
+		# Enable HTTP Strict Transport Security (only if not local)
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" ?defer
+		
+		# Prevent MIME type sniffing
+		X-Content-Type-Options "nosniff"
+		
+		# Prevent clickjacking (allow within same origin if needed)
+		X-Frame-Options "SAMEORIGIN"
+		
+		# Referrer policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+		
+		# Feature Policy / Permissions Policy
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
+		
+		# Remove server identifier
+		-Server
+	}
+
+	# Remove HSTS if we are running in local environment to prevent browser locking
+	@local_env {
+		env CADDY_ENVIRONMENT local
+	}
+	header @local_env -Strict-Transport-Security
+
+	# ---------------------------------------------------------
+	# API and WebSocket Routing
+	# ---------------------------------------------------------
+	
+	# Route all /api/* requests to the backend container
+	handle_path /api/* {
+		reverse_proxy backend:4000 {
+			# Rewrite path to include /api/ back since handle_path strips it
+			rewrite * /api{uri}
+			
+			header_up Host {http.request.host}
+			header_up X-Real-IP {http.request.remote}
+			header_up X-Forwarded-For {http.request.remote}
+			header_up X-Forwarded-Proto {http.request.scheme}
+		}
+	}
+
+	# Route WebSocket requests (Phase 15: Exact paths /ws and /api/v1/ws)
+	handle /ws {
+		reverse_proxy backend:4000 {
+			header_up Host {http.request.host}
+			header_up X-Real-IP {http.request.remote}
+			header_up X-Forwarded-For {http.request.remote}
+			header_up X-Forwarded-Proto {http.request.scheme}
+		}
+	}
+	
+	handle /api/v1/ws {
+		reverse_proxy backend:4000 {
+			header_up Host {http.request.host}
+			header_up X-Real-IP {http.request.remote}
+			header_up X-Forwarded-For {http.request.remote}
+			header_up X-Forwarded-Proto {http.request.scheme}
+		}
+	}
+
+	# ---------------------------------------------------------
+	# Web Frontend Routing
+	# ---------------------------------------------------------
+	
+	# Route everything else to the web container
+	handle {
+		reverse_proxy web:3000 {
+			header_up Host {http.request.host}
+			header_up X-Real-IP {http.request.remote}
+			header_up X-Forwarded-For {http.request.remote}
+			header_up X-Forwarded-Proto {http.request.scheme}
+		}
+	}
+}

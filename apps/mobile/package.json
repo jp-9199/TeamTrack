@@ -1,0 +1,27 @@
+{
+  "name": "@teamtrack/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TeamTrack Mobile Application (React Native + TypeScript)",
+  "scripts": {
+    "start": "react-native start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@teamtrack/shared-types": "*",
+    "@teamtrack/api-client": "*",
+    "react": "18.3.1",
+    "react-native": "^0.76.2",
+    "react-native-keychain": "^10.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "@babel/runtime": "^7.26.0",
+    "@react-native/babel-preset": "^0.76.2",
+    "@react-native/metro-config": "^0.76.2",
+    "@react-native/typescript-config": "^0.76.2",
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.3"
+  }
+}
