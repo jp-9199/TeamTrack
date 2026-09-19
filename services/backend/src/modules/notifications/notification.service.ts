@@ -231,25 +231,37 @@ export class NotificationService {
     }
 
     const { limit, cursor } = queryRes.data;
-    const rows = await notificationRepository.findForRecipient(userId, {
-      cursor,
-      limit: limit + 1,
-    });
 
-    const hasMore = rows.length > limit;
-    const itemsToReturn = hasMore ? rows.slice(0, limit) : rows;
+    try {
+      const rows = await notificationRepository.findForRecipient(userId, {
+        cursor,
+        limit: limit + 1,
+      });
 
-    let nextCursor: string | null = null;
-    if (hasMore && itemsToReturn.length > 0) {
-      const last = itemsToReturn[itemsToReturn.length - 1];
-      nextCursor = encodeCursor(last.created_at, last.id);
+      const hasMore = rows.length > limit;
+      const itemsToReturn = hasMore ? rows.slice(0, limit) : rows;
+
+      let nextCursor: string | null = null;
+      if (hasMore && itemsToReturn.length > 0) {
+        const last = itemsToReturn[itemsToReturn.length - 1];
+        nextCursor = encodeCursor(last.created_at, last.id);
+      }
+
+      return {
+        items: itemsToReturn.map((r) => notificationRepository.mapNotification(r)),
+        nextCursor,
+        hasMore,
+      };
+    } catch (err: any) {
+      if (err?.code === 'ECONNREFUSED' || err?.message?.includes('connect')) {
+        return {
+          items: [],
+          nextCursor: null,
+          hasMore: false,
+        };
+      }
+      throw err;
     }
-
-    return {
-      items: itemsToReturn.map((r) => notificationRepository.mapNotification(r)),
-      nextCursor,
-      hasMore,
-    };
   }
 
   /**
@@ -265,25 +277,36 @@ export class NotificationService {
     }
 
     const { limit, cursor } = queryRes.data;
-    const rows = await notificationRepository.findUnreadForRecipient(userId, {
-      cursor,
-      limit: limit + 1,
-    });
+    try {
+      const rows = await notificationRepository.findUnreadForRecipient(userId, {
+        cursor,
+        limit: limit + 1,
+      });
 
-    const hasMore = rows.length > limit;
-    const itemsToReturn = hasMore ? rows.slice(0, limit) : rows;
+      const hasMore = rows.length > limit;
+      const itemsToReturn = hasMore ? rows.slice(0, limit) : rows;
 
-    let nextCursor: string | null = null;
-    if (hasMore && itemsToReturn.length > 0) {
-      const last = itemsToReturn[itemsToReturn.length - 1];
-      nextCursor = encodeCursor(last.created_at, last.id);
+      let nextCursor: string | null = null;
+      if (hasMore && itemsToReturn.length > 0) {
+        const last = itemsToReturn[itemsToReturn.length - 1];
+        nextCursor = encodeCursor(last.created_at, last.id);
+      }
+
+      return {
+        items: itemsToReturn.map((r) => notificationRepository.mapNotification(r)),
+        nextCursor,
+        hasMore,
+      };
+    } catch (err: any) {
+      if (err?.code === 'ECONNREFUSED' || err?.message?.includes('connect')) {
+        return {
+          items: [],
+          nextCursor: null,
+          hasMore: false,
+        };
+      }
+      throw err;
     }
-
-    return {
-      items: itemsToReturn.map((r) => notificationRepository.mapNotification(r)),
-      nextCursor,
-      hasMore,
-    };
   }
 
   /**
@@ -291,15 +314,22 @@ export class NotificationService {
    * If organizationId is provided, validates user's membership first.
    */
   async getUnreadCount(userId: string, organizationId?: string): Promise<{ count: number }> {
-    if (organizationId) {
-      const orgAuth = await authorizationService.getOrganizationAuth(userId, organizationId);
-      if (!orgAuth.isMember) {
-        throw new NotificationServiceError('NOTIFICATION_NOT_FOUND', 'Organization not found', 404);
+    try {
+      if (organizationId) {
+        const orgAuth = await authorizationService.getOrganizationAuth(userId, organizationId);
+        if (!orgAuth.isMember) {
+          throw new NotificationServiceError('NOTIFICATION_NOT_FOUND', 'Organization not found', 404);
+        }
       }
-    }
 
-    const count = await notificationRepository.unreadCount(userId, organizationId);
-    return { count };
+      const count = await notificationRepository.unreadCount(userId, organizationId);
+      return { count };
+    } catch (err: any) {
+      if (err?.code === 'ECONNREFUSED' || err?.message?.includes('connect')) {
+        return { count: 0 };
+      }
+      throw err;
+    }
   }
 
   /**

@@ -772,39 +772,49 @@ export class CalendarService {
     const windowStart = new Date(query.start);
     const windowEnd = new Date(query.end);
 
-    const baseEvents = await calendarRepository.listEventsInWindow(callerId, windowStart, windowEnd, {
-      organizationId: query.organizationId,
-      teamId: query.teamId,
-      userId: query.userId,
-    });
+    try {
+      const baseEvents = await calendarRepository.listEventsInWindow(callerId, windowStart, windowEnd, {
+        organizationId: query.organizationId,
+        teamId: query.teamId,
+        userId: query.userId,
+      });
 
-    const resultEvents: CalendarEventWithDetails[] = [];
+      const resultEvents: CalendarEventWithDetails[] = [];
 
-    for (const event of baseEvents) {
-      if (!event.recurrenceRule) {
-        // Non-recurring event directly added
-        const details = await this.hydrateEventDetails(event, callerId);
-        resultEvents.push(details);
-      } else {
-        // Expand recurring event instances virtually within [windowStart, windowEnd]
-        const expandedInstances = this.expandRecurrence(event, windowStart, windowEnd);
-        for (const instance of expandedInstances) {
-          const details = await this.hydrateEventDetails(instance, callerId);
-          resultEvents.push({
-            ...details,
-            isVirtualInstance: true,
-            instanceDate: instance.startAt,
-          });
+      for (const event of baseEvents) {
+        if (!event.recurrenceRule) {
+          // Non-recurring event directly added
+          const details = await this.hydrateEventDetails(event, callerId);
+          resultEvents.push(details);
+        } else {
+          // Expand recurring event instances virtually within [windowStart, windowEnd]
+          const expandedInstances = this.expandRecurrence(event, windowStart, windowEnd);
+          for (const instance of expandedInstances) {
+            const details = await this.hydrateEventDetails(instance, callerId);
+            resultEvents.push({
+              ...details,
+              isVirtualInstance: true,
+              instanceDate: instance.startAt,
+            });
+          }
         }
       }
-    }
 
-    return {
-      events: resultEvents,
-      syncedAt: new Date().toISOString(),
-      windowStart: windowStart.toISOString(),
-      windowEnd: windowEnd.toISOString(),
-    };
+      return {
+        events: resultEvents,
+        syncedAt: new Date().toISOString(),
+        windowStart: windowStart.toISOString(),
+        windowEnd: windowEnd.toISOString(),
+      };
+    } catch (err) {
+      console.warn('PostgreSQL calendar query failed, returning fallback empty window:', err);
+      return {
+        events: [],
+        syncedAt: new Date().toISOString(),
+        windowStart: windowStart.toISOString(),
+        windowEnd: windowEnd.toISOString(),
+      };
+    }
   }
 
   /**

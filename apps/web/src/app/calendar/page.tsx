@@ -1,41 +1,78 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
-import type {
-  CalendarEventWithDetails,
-  CalendarEventVisibility,
-  CalendarAttendeeResponseStatus,
-} from '@teamtrack/shared-types';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { TeamsShell } from '../../components/layout/TeamsShell';
+import {
+  Tooltip,
+  Button,
+  Input,
+  TabList,
+  Tab,
+  Dialog,
+  DialogSurface,
+  DialogTitle,
+  DialogBody,
+  DialogContent,
+  DialogActions,
+} from '@fluentui/react-components';
+import {
+  ChevronLeftRegular,
+  ChevronRightRegular,
+  AddRegular,
+  VideoRegular,
+  ClockRegular,
+  PeopleRegular,
+  DismissRegular,
+  LocationRegular,
+  DeleteRegular,
+  ShareRegular,
+} from '@fluentui/react-icons';
+import { useAuth } from '../../components/auth/AuthContext';
+import type { CalendarEventWithDetails } from '@teamtrack/shared-types';
 
-type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda';
+type CalendarViewMode = 'day' | 'workWeek' | 'week' | 'month' | 'agenda';
 
 export default function CalendarPage() {
-  const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 8, 15)); // Default to Sept 15, 2026
+  const router = useRouter();
+  const { user } = useAuth();
+  const userName = user?.displayName || 'Amir Asad Ullah Khan';
+
+  // Active view state
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [miniPickerDate, setMiniPickerDate] = useState<Date>(new Date());
+
+  // Real events state
   const [events, setEvents] = useState<CalendarEventWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventWithDetails | null>(null);
+
+  // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [timeZone, setTimeZone] = useState('UTC');
+  const [isMeetNowModalOpen, setIsMeetNowModalOpen] = useState(false);
 
   // New Event Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
-  const [startDateStr, setStartDateStr] = useState('2026-09-15');
-  const [startTimeStr, setStartTimeStr] = useState('10:00');
-  const [endDateStr, setEndDateStr] = useState('2026-09-15');
-  const [endTimeStr, setEndTimeStr] = useState('11:00');
-  const [allDay, setAllDay] = useState(false);
-  const [visibility, setVisibility] = useState<CalendarEventVisibility>('ORGANIZATION');
-  const [recurrenceRule, setRecurrenceRule] = useState('none');
-  const [linkMeeting, setLinkMeeting] = useState(false);
-  const [attendeeEmail, setAttendeeEmail] = useState('');
-  const [reminderMinutes, setReminderMinutes] = useState(15);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [startDateStr, setStartDateStr] = useState('');
+  const [startTimeStr, setStartTimeStr] = useState('09:00');
+  const [endDateStr, setEndDateStr] = useState('');
+  const [endTimeStr, setEndTimeStr] = useState('10:00');
+  const [isOnlineMeeting, setIsOnlineMeeting] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  // Compute window range based on viewMode and currentDate
+  // Format today helper
+  const getTodayISO = () => new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    setStartDateStr(getTodayISO());
+    setEndDateStr(getTodayISO());
+  }, []);
+
+  // Compute active window range based on viewMode and currentDate
   const { windowStart, windowEnd, headerTitle } = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -48,21 +85,30 @@ export default function CalendarPage() {
         windowEnd: lastDay.toISOString(),
         headerTitle: currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
       };
-    } else if (viewMode === 'week') {
+    } else if (viewMode === 'workWeek' || viewMode === 'week') {
       const day = currentDate.getDay();
-      const diff = currentDate.getDate() - day; // start on Sunday
+      const startOffset = viewMode === 'workWeek' ? (day === 0 ? -6 : 1 - day) : -day;
+      const daysCount = viewMode === 'workWeek' ? 5 : 7;
+
       const startOfWeek = new Date(currentDate);
-      startOfWeek.setDate(diff);
+      startOfWeek.setDate(currentDate.getDate() + startOffset);
       startOfWeek.setHours(0, 0, 0, 0);
 
       const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setDate(startOfWeek.getDate() + daysCount - 1);
       endOfWeek.setHours(23, 59, 59, 999);
+
+      const startMonth = startOfWeek.toLocaleString('default', { month: 'short' });
+      const endMonth = endOfWeek.toLocaleString('default', { month: 'short' });
+      const title =
+        startMonth === endMonth
+          ? `${startMonth} ${startOfWeek.getDate()} – ${endOfWeek.getDate()}, ${startOfWeek.getFullYear()}`
+          : `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}, ${endOfWeek.getFullYear()}`;
 
       return {
         windowStart: startOfWeek.toISOString(),
         windowEnd: endOfWeek.toISOString(),
-        headerTitle: `Week of ${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+        headerTitle: title,
       };
     } else if (viewMode === 'day') {
       const startOfDay = new Date(currentDate);
@@ -72,10 +118,14 @@ export default function CalendarPage() {
       return {
         windowStart: startOfDay.toISOString(),
         windowEnd: endOfDay.toISOString(),
-        headerTitle: currentDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+        headerTitle: currentDate.toLocaleDateString('default', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        }),
       };
     } else {
-      // Agenda: 30 days from current date
       const start = new Date(currentDate);
       start.setHours(0, 0, 0, 0);
       const end = new Date(currentDate);
@@ -84,142 +134,48 @@ export default function CalendarPage() {
       return {
         windowStart: start.toISOString(),
         windowEnd: end.toISOString(),
-        headerTitle: `Agenda (${start.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('default', { month: 'short', day: 'numeric' })})`,
+        headerTitle: `Agenda (${start.toLocaleDateString('default', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('default', { month: 'short', day: 'numeric' })})`,
       };
     }
   }, [viewMode, currentDate]);
 
-  // Fetch events for active window
-  const loadEvents = async () => {
+  // Fetch real events from backend
+  const loadEvents = useCallback(async () => {
     setIsLoading(true);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || 'demo-user-token' : 'demo-user-token';
+    const headers = { Authorization: `Bearer ${token}` };
+
     try {
-      const res = await fetch(`/api/v1/calendar/events?start=${encodeURIComponent(windowStart)}&end=${encodeURIComponent(windowEnd)}`);
+      const res = await fetch(
+        `/api/v1/calendar/events?start=${encodeURIComponent(windowStart)}&end=${encodeURIComponent(windowEnd)}`,
+        { headers }
+      );
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
           setEvents(json.data.events || []);
-          return;
+        } else {
+          setEvents([]);
         }
+      } else {
+        setEvents([]);
       }
     } catch {
-      // Fallback for offline / dev preview
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
-
-    // Default sample events for UI preview when backend is not connected
-    if (events.length === 0) {
-      setEvents([
-        {
-          id: 'demo-event-1',
-          organizationId: 'org-1',
-          teamId: 'team-1',
-          organizerUserId: 'user-1',
-          title: 'Sprint Planning & Architecture Review',
-          description: 'Review upcoming deliverables, calendar & scheduling integration tasks.',
-          location: 'Virtual Meeting Room 1',
-          startAt: new Date(Date.UTC(2026, 8, 15, 10, 0)).toISOString(),
-          endAt: new Date(Date.UTC(2026, 8, 15, 11, 30)).toISOString(),
-          timezone: 'UTC',
-          allDay: false,
-          visibility: 'ORGANIZATION',
-          status: 'confirmed',
-          meetingId: 'meet-1',
-          recurrenceRule: null,
-          recurrenceUntil: null,
-          recurrenceTimezone: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          deletedAt: null,
-          organizer: {
-            id: 'user-1',
-            displayName: 'Alex Rivers',
-            email: 'alex.rivers@example.com',
-            avatarUrl: null,
-          },
-          attendees: [
-            {
-              id: 'att-1',
-              eventId: 'demo-event-1',
-              userId: 'user-1',
-              responseStatus: 'ACCEPTED',
-              isOrganizer: true,
-              respondedAt: new Date().toISOString(),
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              user: {
-                id: 'user-1',
-                displayName: 'Alex Rivers',
-                email: 'alex.rivers@example.com',
-                avatarUrl: null,
-              },
-            },
-            {
-              id: 'att-2',
-              eventId: 'demo-event-1',
-              userId: 'user-2',
-              responseStatus: 'PENDING',
-              isOrganizer: false,
-              respondedAt: null,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              user: {
-                id: 'user-2',
-                displayName: 'Sarah Chen',
-                email: 'sarah.chen@example.com',
-                avatarUrl: null,
-              },
-            },
-          ],
-          meeting: {
-            id: 'meet-1',
-            title: 'Sprint Planning',
-            status: 'scheduled',
-          },
-        },
-        {
-          id: 'demo-event-2',
-          organizationId: 'org-1',
-          teamId: null,
-          organizerUserId: 'user-2',
-          title: 'Design Sync: Mobile Calendar View',
-          description: 'Touch gesture patterns, date strips and agenda interactions.',
-          location: 'TeamTrack Audio/Video',
-          startAt: new Date(Date.UTC(2026, 8, 17, 14, 0)).toISOString(),
-          endAt: new Date(Date.UTC(2026, 8, 17, 15, 0)).toISOString(),
-          timezone: 'UTC',
-          allDay: false,
-          visibility: 'PRIVATE',
-          status: 'confirmed',
-          meetingId: null,
-          recurrenceRule: 'FREQ=WEEKLY;INTERVAL=1',
-          recurrenceUntil: null,
-          recurrenceTimezone: 'UTC',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          deletedAt: null,
-          organizer: {
-            id: 'user-2',
-            displayName: 'Sarah Chen',
-            email: 'sarah.chen@example.com',
-            avatarUrl: null,
-          },
-          attendees: [],
-          meeting: null,
-        },
-      ]);
-    }
-  };
+  }, [windowStart, windowEnd]);
 
   useEffect(() => {
     loadEvents();
-  }, [windowStart, windowEnd]);
+  }, [loadEvents]);
 
-  // Navigate Date
+  // Navigate dates
   const handlePrev = () => {
     const next = new Date(currentDate);
     if (viewMode === 'month') next.setMonth(next.getMonth() - 1);
-    else if (viewMode === 'week') next.setDate(next.getDate() - 7);
+    else if (viewMode === 'week' || viewMode === 'workWeek') next.setDate(next.getDate() - 7);
     else if (viewMode === 'day') next.setDate(next.getDate() - 1);
     else next.setDate(next.getDate() - 30);
     setCurrentDate(next);
@@ -228,1053 +184,837 @@ export default function CalendarPage() {
   const handleNext = () => {
     const next = new Date(currentDate);
     if (viewMode === 'month') next.setMonth(next.getMonth() + 1);
-    else if (viewMode === 'week') next.setDate(next.getDate() + 7);
+    else if (viewMode === 'week' || viewMode === 'workWeek') next.setDate(next.getDate() + 7);
     else if (viewMode === 'day') next.setDate(next.getDate() + 1);
     else next.setDate(next.getDate() + 30);
     setCurrentDate(next);
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date(2026, 8, 15));
+    const today = new Date();
+    setCurrentDate(today);
+    setMiniPickerDate(today);
   };
 
-  // RSVP Response Handler
-  const handleRsvp = async (eventId: string, status: CalendarAttendeeResponseStatus) => {
-    try {
-      await fetch(`/api/v1/calendar/events/${eventId}/respond`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ responseStatus: status }),
-      });
-    } catch {
-      // optimistic update
-    }
-
-    setEvents((prev) =>
-      prev.map((ev) => {
-        if (ev.id !== eventId) return ev;
-        return {
-          ...ev,
-          attendees: ev.attendees.map((att) =>
-            att.userId === 'user-1' ? { ...att, responseStatus: status, respondedAt: new Date().toISOString() } : att
-          ),
-        };
-      })
-    );
-
-    if (selectedEvent && selectedEvent.id === eventId) {
-      setSelectedEvent((prev) =>
-        prev
-          ? {
-              ...prev,
-              attendees: prev.attendees.map((att) =>
-                att.userId === 'user-1'
-                  ? { ...att, responseStatus: status, respondedAt: new Date().toISOString() }
-                  : att
-              ),
-            }
-          : null
-      );
-    }
-  };
-
-  // Create Event Form Submit
+  // Create meeting submit
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitError(null);
-
-    const startAt = allDay
-      ? new Date(`${startDateStr}T00:00:00Z`).toISOString()
-      : new Date(`${startDateStr}T${startTimeStr}:00Z`).toISOString();
-    const endAt = allDay
-      ? new Date(`${endDateStr}T23:59:59Z`).toISOString()
-      : new Date(`${endDateStr}T${endTimeStr}:00Z`).toISOString();
-
-    if (new Date(endAt).getTime() < new Date(startAt).getTime()) {
-      setSubmitError('End time must be after start time');
+    if (!title.trim()) {
+      setCreateError('Please enter a meeting title');
       return;
     }
 
-    let rrule: string | null = null;
-    if (recurrenceRule === 'daily') rrule = 'FREQ=DAILY;INTERVAL=1';
-    else if (recurrenceRule === 'weekly') rrule = 'FREQ=WEEKLY;INTERVAL=1';
-    else if (recurrenceRule === 'monthly') rrule = 'FREQ=MONTHLY;INTERVAL=1';
+    setIsSubmitting(true);
+    setCreateError(null);
 
-    const payload = {
-      title,
-      description: description || null,
-      location: location || null,
-      startAt,
-      endAt,
-      timezone: timeZone,
-      allDay,
-      visibility,
-      recurrenceRule: rrule,
-      reminders: [reminderMinutes],
-    };
+    const startAt = new Date(`${startDateStr}T${startTimeStr}:00`).toISOString();
+    const endAt = new Date(`${endDateStr}T${endTimeStr}:00`).toISOString();
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || 'demo-user-token' : 'demo-user-token';
 
     try {
       const res = await fetch('/api/v1/calendar/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          location: isOnlineMeeting ? 'Microsoft Teams Meeting' : location.trim() || undefined,
+          startAt,
+          endAt,
+          allDay: false,
+          visibility: 'ORGANIZATION',
+          linkMeeting: isOnlineMeeting,
+        }),
+      }).then((r) => r.json());
 
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          setEvents((prev) => [json.data, ...prev]);
-          setIsCreateModalOpen(false);
-          resetForm();
-          return;
-        }
+      if (res.success && res.data) {
+        setIsCreateModalOpen(false);
+        setTitle('');
+        setDescription('');
+        setLocation('');
+        loadEvents();
+      } else {
+        setCreateError(res.error?.message || 'Failed to schedule meeting');
       }
     } catch {
-      // Local optimistic fallback
+      setCreateError('Network error while scheduling meeting');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const optimisticEvent: CalendarEventWithDetails = {
-      id: `local-${Date.now()}`,
-      organizationId: 'org-1',
-      teamId: null,
-      organizerUserId: 'user-1',
-      title,
-      description: description || null,
-      location: location || null,
-      startAt,
-      endAt,
-      timezone: timeZone,
-      allDay,
-      visibility,
-      status: 'confirmed',
-      meetingId: linkMeeting ? `meet-${Date.now()}` : null,
-      recurrenceRule: rrule,
-      recurrenceUntil: null,
-      recurrenceTimezone: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      deletedAt: null,
-      organizer: {
-        id: 'user-1',
-        displayName: 'Demo User',
-        email: 'user@example.com',
-        avatarUrl: null,
-      },
-      attendees: [
-        {
-          id: `att-${Date.now()}`,
-          eventId: `local-${Date.now()}`,
-          userId: 'user-1',
-          responseStatus: 'ACCEPTED',
-          isOrganizer: true,
-          respondedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          user: {
-            id: 'user-1',
-            displayName: 'Demo User',
-            email: 'user@example.com',
-            avatarUrl: null,
-          },
-        },
-      ],
-      meeting: linkMeeting
-        ? {
-            id: `meet-${Date.now()}`,
-            title,
-            status: 'scheduled',
-          }
-        : null,
-    };
-
-    setEvents((prev) => [optimisticEvent, ...prev]);
-    setIsCreateModalOpen(false);
-    resetForm();
   };
 
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setLocation('');
-    setAllDay(false);
-    setVisibility('ORGANIZATION');
-    setRecurrenceRule('none');
-    setLinkMeeting(false);
-    setSubmitError(null);
-  };
+  // Delete event
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Are you sure you want to cancel this meeting?')) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || 'demo-user-token' : 'demo-user-token';
 
-  // Render Month View Grid
-  const renderMonthView = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDayIndex = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const days = [];
-    // Leading blanks
-    for (let i = 0; i < firstDayIndex; i++) {
-      days.push(<div key={`blank-${i}`} style={{ minHeight: '110px', backgroundColor: '#090d16', border: '1px solid rgba(148, 163, 184, 0.08)' }} />);
-    }
-
-    // Days of month
-    for (let d = 1; d <= daysInMonth; d++) {
-      const isToday = d === 15 && month === 8 && year === 2026;
-      const dayEvents = events.filter((ev) => {
-        const evDate = new Date(ev.startAt);
-        return evDate.getUTCDate() === d && evDate.getUTCMonth() === month && evDate.getUTCFullYear() === year;
+    try {
+      await fetch(`/api/v1/calendar/events/${eventId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
       });
+      setSelectedEvent(null);
+      loadEvents();
+    } catch (err) {
+      console.error('Failed to delete event', err);
+    }
+  };
 
-      days.push(
-        <div
-          key={`day-${d}`}
-          style={{
-            minHeight: '110px',
-            backgroundColor: isToday ? 'rgba(59, 130, 246, 0.05)' : '#0f172a',
-            border: isToday ? '1px solid #3b82f6' : '1px solid rgba(148, 163, 184, 0.12)',
-            borderRadius: '4px',
-            padding: '6px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-          }}
+  // Instant Meet Now
+  const handleInstantMeetNow = () => {
+    const meetId = `meet-${Date.now()}`;
+    router.push(`/meetings/room/${meetId}`);
+  };
+
+  // Quick slot click to create event
+  const handleSlotClick = (date: Date, hour: number) => {
+    const dStr = date.toISOString().split('T')[0];
+    const hStr = hour.toString().padStart(2, '0');
+    const nextHStr = (hour + 1).toString().padStart(2, '0');
+    setStartDateStr(dStr);
+    setEndDateStr(dStr);
+    setStartTimeStr(`${hStr}:00`);
+    setEndTimeStr(`${nextHStr}:00`);
+    setIsCreateModalOpen(true);
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // 1. SECONDARY SIDEBAR: Microsoft Teams Native Calendar Rail
+  // ─────────────────────────────────────────────────────────────
+  const calendarSidebar = (
+    <div className="flex flex-col h-full bg-white select-none border-r border-[#EDEBE9] p-4 font-sans">
+      {/* Top Action Buttons: Fluent UI Buttons */}
+      <div className="space-y-2 mb-6">
+        <Button
+          appearance="secondary"
+          icon={<VideoRegular fontSize={18} />}
+          onClick={() => setIsMeetNowModalOpen(true)}
+          style={{ width: '100%', height: '36px' }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-            <span
-              style={{
-                fontSize: '0.85rem',
-                fontWeight: isToday ? 700 : 500,
-                color: isToday ? '#60a5fa' : '#94a3b8',
-                borderRadius: '50%',
-                width: isToday ? '22px' : 'auto',
-                height: isToday ? '22px' : 'auto',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: isToday ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+          Meet now
+        </Button>
+
+        <Button
+          appearance="primary"
+          icon={<AddRegular fontSize={18} />}
+          onClick={() => setIsCreateModalOpen(true)}
+          style={{ width: '100%', height: '36px' }}
+        >
+          New meeting
+        </Button>
+      </div>
+
+      {/* Mini Month Calendar Picker */}
+      <div className="mb-6 p-2 rounded-xl bg-[#FAF9F8] border border-[#EDEBE9]">
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#EDEBE9]">
+          <span className="text-[13px] font-bold text-[#242424]">
+            {miniPickerDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              appearance="subtle"
+              size="small"
+              icon={<ChevronLeftRegular fontSize={14} />}
+              onClick={() => {
+                const next = new Date(miniPickerDate);
+                next.setMonth(next.getMonth() - 1);
+                setMiniPickerDate(next);
               }}
-            >
+              aria-label="Previous month"
+            />
+            <Button
+              appearance="subtle"
+              size="small"
+              icon={<ChevronRightRegular fontSize={14} />}
+              onClick={() => {
+                const next = new Date(miniPickerDate);
+                next.setMonth(next.getMonth() + 1);
+                setMiniPickerDate(next);
+              }}
+              aria-label="Next month"
+            />
+          </div>
+        </div>
+
+        {/* Mini 7x6 Grid */}
+        <div className="grid grid-cols-7 gap-1 text-center text-[11px]">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+            <span key={i} className="text-[#888] font-bold py-1">
               {d}
             </span>
-            {dayEvents.length > 0 && (
-              <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{dayEvents.length} event{dayEvents.length > 1 ? 's' : ''}</span>
-            )}
-          </div>
-
-          {/* Event Chips */}
-          {dayEvents.map((ev) => (
-            <div
-              key={ev.id}
-              onClick={() => setSelectedEvent(ev)}
-              style={{
-                backgroundColor: ev.visibility === 'PRIVATE' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                borderLeft: `3px solid ${ev.visibility === 'PRIVATE' ? '#ef4444' : '#3b82f6'}`,
-                borderRadius: '3px',
-                padding: '3px 6px',
-                fontSize: '0.75rem',
-                color: '#f8fafc',
-                cursor: 'pointer',
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-                transition: 'background 0.15s',
-              }}
-              title={ev.title}
-            >
-              <span style={{ fontWeight: 600, marginRight: '4px' }}>
-                {new Date(ev.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              {ev.title}
-            </div>
           ))}
-        </div>
-      );
-    }
 
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {/* Day of week headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', marginBottom: '4px' }}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dw) => (
-            <div key={dw} style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b', padding: '4px 0' }}>
-              {dw}
-            </div>
-          ))}
-        </div>
-        {/* Month grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-          {days}
-        </div>
-      </div>
-    );
-  };
+          {(() => {
+            const year = miniPickerDate.getFullYear();
+            const month = miniPickerDate.getMonth();
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const cells = [];
 
-  // Render Agenda / List View
-  const renderAgendaView = () => {
-    if (events.length === 0) {
-      return (
-        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#64748b' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📅</div>
-          <h3 style={{ fontSize: '1.1rem', color: '#94a3b8', margin: 0 }}>No scheduled events</h3>
-          <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Use the "+ New Event" button to schedule an event or meeting.</p>
-        </div>
-      );
-    }
+            for (let i = 0; i < firstDayIndex; i++) {
+              cells.push(<span key={`empty-${i}`} className="py-1" />);
+            }
 
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {events.map((ev) => {
-          const startDate = new Date(ev.startAt);
-          const endDate = new Date(ev.endAt);
-          return (
-            <div
-              key={ev.id}
-              onClick={() => setSelectedEvent(ev)}
-              style={{
-                backgroundColor: '#1e293b',
-                border: '1px solid rgba(148, 163, 184, 0.15)',
-                borderRadius: '8px',
-                padding: '1rem 1.25rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                transition: 'border-color 0.15s, background 0.15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.15)')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                {/* Date Badge */}
-                <div
-                  style={{
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    borderRadius: '8px',
-                    padding: '0.5rem 0.75rem',
-                    textAlign: 'center',
-                    minWidth: '55px',
-                  }}
+            for (let day = 1; day <= daysInMonth; day++) {
+              const dateObj = new Date(year, month, day);
+              const isToday = dateObj.toDateString() === new Date().toDateString();
+              const isSelected = dateObj.toDateString() === currentDate.toDateString();
+
+              cells.push(
+                <button
+                  key={day}
+                  onClick={() => setCurrentDate(dateObj)}
+                  className={`py-1 rounded-full font-medium transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#5B5FC7] text-white font-bold'
+                      : isToday
+                      ? 'border border-[#5B5FC7] text-[#5B5FC7] font-bold'
+                      : 'hover:bg-[#EDEBE9] text-[#242424]'
+                  }`}
                 >
-                  <div style={{ fontSize: '0.7rem', color: '#60a5fa', textTransform: 'uppercase', fontWeight: 600 }}>
-                    {startDate.toLocaleDateString([], { month: 'short' })}
-                  </div>
-                  <div style={{ fontSize: '1.25rem', color: '#ffffff', fontWeight: 700 }}>
-                    {startDate.getUTCDate()}
-                  </div>
-                </div>
-
-                {/* Event Info */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#f8fafc' }}>{ev.title}</h3>
-                    <span
-                      style={{
-                        fontSize: '0.65rem',
-                        fontWeight: 600,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                        backgroundColor:
-                          ev.visibility === 'PRIVATE'
-                            ? 'rgba(239, 68, 68, 0.15)'
-                            : ev.visibility === 'TEAM'
-                            ? 'rgba(234, 179, 8, 0.15)'
-                            : 'rgba(59, 130, 246, 0.15)',
-                        color:
-                          ev.visibility === 'PRIVATE'
-                            ? '#f87171'
-                            : ev.visibility === 'TEAM'
-                            ? '#facc15'
-                            : '#60a5fa',
-                      }}
-                    >
-                      {ev.visibility}
-                    </span>
-                    {ev.recurrenceRule && (
-                      <span style={{ fontSize: '0.65rem', color: '#94a3b8', backgroundColor: 'rgba(148, 163, 184, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                        🔁 Recurring
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                    🕒 {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({ev.timezone})
-                    {ev.location && ` • 📍 ${ev.location}`}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right side actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                {ev.meeting && (
-                  <Link
-                    href={`/meetings?id=${ev.meeting.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      textDecoration: 'none',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      padding: '0.4rem 0.85rem',
-                      borderRadius: '6px',
-                    }}
-                  >
-                    Join Meeting
-                  </Link>
-                )}
-                <span style={{ color: '#64748b', fontSize: '1rem' }}>&rarr;</span>
-              </div>
-            </div>
-          );
-        })}
+                  {day}
+                </button>
+              );
+            }
+            return cells;
+          })()}
+        </div>
       </div>
-    );
-  };
 
+      {/* My Calendars Checkbox List */}
+      <div className="space-y-3">
+        <h4 className="text-[12px] font-bold uppercase tracking-wider text-[#616161]">My Calendars</h4>
+        <div className="space-y-2 text-[13px] text-[#242424]">
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" defaultChecked className="rounded text-[#5B5FC7] focus:ring-0" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#5B5FC7]" />
+            <span className="font-medium">Calendar (TeamTrack)</span>
+          </label>
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" defaultChecked className="rounded text-[#107C10] focus:ring-0" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#107C10]" />
+            <span className="font-medium">Team Meetings</span>
+          </label>
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" className="rounded text-[#D83B01] focus:ring-0" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#D83B01]" />
+            <span className="font-medium">Personal Reminders</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // 2. MAIN STAGE: Microsoft Teams Calendar Canvas
+  // ─────────────────────────────────────────────────────────────
   return (
-    <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem 2rem', color: '#f8fafc' }}>
-      {/* Top Header & Navigation Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#f8fafc' }}>
-            Calendar & Scheduling
-          </h1>
+    <TeamsShell sidebar={calendarSidebar} activeApp="calendar">
+      <div className="flex flex-col h-full bg-white select-none overflow-hidden font-sans">
+        {/* Top Control Header Bar */}
+        <header className="h-[60px] px-6 border-b border-[#EDEBE9] flex items-center justify-between shrink-0 bg-white z-20">
+          {/* Left: Today + Navigation Arrows + Month Heading */}
+          <div className="flex items-center gap-3">
+            <Button appearance="secondary" size="small" onClick={handleToday}>
+              Today
+            </Button>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: 'rgba(148, 163, 184, 0.1)',
-              padding: '2px 8px',
-              borderRadius: '6px',
-              fontSize: '0.75rem',
-              color: '#94a3b8',
-            }}
-          >
-            🌐 {timeZone}
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {/* View Mode Switcher */}
-          <div style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '8px', padding: '3px', border: '1px solid rgba(148, 163, 184, 0.15)' }}>
-            {(['month', 'week', 'day', 'agenda'] as CalendarViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  textTransform: 'capitalize',
-                  border: 'none',
-                  cursor: 'pointer',
-                  backgroundColor: viewMode === mode ? '#3b82f6' : 'transparent',
-                  color: viewMode === mode ? '#ffffff' : '#94a3b8',
-                  transition: 'background 0.15s',
-                }}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-
-          {/* New Event Button */}
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            style={{
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '7px 14px',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            + New Event
-          </button>
-        </div>
-      </div>
-
-      {/* Date Navigation Strip */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#1e293b',
-          border: '1px solid rgba(148, 163, 184, 0.15)',
-          borderRadius: '8px',
-          padding: '0.6rem 1rem',
-          marginBottom: '1.25rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            onClick={handlePrev}
-            style={{
-              backgroundColor: 'rgba(148, 163, 184, 0.1)',
-              border: 'none',
-              borderRadius: '4px',
-              color: '#ffffff',
-              padding: '4px 10px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
-          >
-            &lt;
-          </button>
-          <button
-            onClick={handleNext}
-            style={{
-              backgroundColor: 'rgba(148, 163, 184, 0.1)',
-              border: 'none',
-              borderRadius: '4px',
-              color: '#ffffff',
-              padding: '4px 10px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
-          >
-            &gt;
-          </button>
-          <button
-            onClick={handleToday}
-            style={{
-              backgroundColor: 'rgba(148, 163, 184, 0.1)',
-              border: 'none',
-              borderRadius: '4px',
-              color: '#94a3b8',
-              padding: '4px 10px',
-              cursor: 'pointer',
-              fontSize: '0.8rem',
-              fontWeight: 500,
-            }}
-          >
-            Today
-          </button>
-
-          <span style={{ fontSize: '1.1rem', fontWeight: 700, marginLeft: '0.5rem', color: '#f8fafc' }}>
-            {headerTitle}
-          </span>
-        </div>
-
-        {isLoading && (
-          <span style={{ fontSize: '0.8rem', color: '#60a5fa' }}>Synchronizing...</span>
-        )}
-      </div>
-
-      {/* Calendar Body */}
-      {viewMode === 'month' ? renderMonthView() : renderAgendaView()}
-
-      {/* Event Details Modal */}
-      {selectedEvent && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem',
-          }}
-          onClick={() => setSelectedEvent(null)}
-        >
-          <div
-            style={{
-              backgroundColor: '#1e293b',
-              border: '1px solid rgba(148, 163, 184, 0.25)',
-              borderRadius: '12px',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '1.75rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span
-                  style={{
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    textTransform: 'uppercase',
-                    backgroundColor:
-                      selectedEvent.visibility === 'PRIVATE'
-                        ? 'rgba(239, 68, 68, 0.2)'
-                        : 'rgba(59, 130, 246, 0.2)',
-                    color: selectedEvent.visibility === 'PRIVATE' ? '#f87171' : '#60a5fa',
-                  }}
-                >
-                  {selectedEvent.visibility}
-                </span>
-                <h2 style={{ margin: '0.5rem 0 0 0', fontSize: '1.35rem', fontWeight: 700, color: '#f8fafc' }}>
-                  {selectedEvent.title}
-                </h2>
-              </div>
-              <button
-                onClick={() => setSelectedEvent(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  fontSize: '1.25rem',
-                  cursor: 'pointer',
-                }}
-              >
-                &times;
-              </button>
+            <div className="flex items-center gap-0.5">
+              <Button
+                appearance="subtle"
+                size="small"
+                icon={<ChevronLeftRegular fontSize={18} />}
+                onClick={handlePrev}
+                aria-label="Previous"
+              />
+              <Button
+                appearance="subtle"
+                size="small"
+                icon={<ChevronRightRegular fontSize={18} />}
+                onClick={handleNext}
+                aria-label="Next"
+              />
             </div>
 
-            <div style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <div>🕒 {new Date(selectedEvent.startAt).toLocaleString()} - {new Date(selectedEvent.endAt).toLocaleTimeString()} ({selectedEvent.timezone})</div>
-              {selectedEvent.location && <div>📍 {selectedEvent.location}</div>}
-              <div>👤 Organizer: {selectedEvent.organizer.displayName} ({selectedEvent.organizer.email})</div>
-              {selectedEvent.recurrenceRule && <div>🔁 Recurrence: {selectedEvent.recurrenceRule}</div>}
+            <h2 className="text-[17px] font-bold text-[#242424] tracking-tight ml-2">
+              {headerTitle}
+            </h2>
+          </div>
+
+          {/* Right: View Switcher TabList & Actions */}
+          <div className="flex items-center gap-3">
+            <TabList
+              selectedValue={viewMode}
+              onTabSelect={(_, data) => setViewMode(data.value as CalendarViewMode)}
+              size="small"
+            >
+              <Tab value="day">Day</Tab>
+              <Tab value="workWeek">Work week</Tab>
+              <Tab value="week">Week</Tab>
+              <Tab value="month">Month</Tab>
+              <Tab value="agenda">Agenda</Tab>
+            </TabList>
+
+            <Button
+              appearance="secondary"
+              size="medium"
+              icon={<VideoRegular fontSize={16} />}
+              onClick={() => setIsMeetNowModalOpen(true)}
+            >
+              Meet now
+            </Button>
+
+            <Button
+              appearance="primary"
+              size="medium"
+              icon={<AddRegular fontSize={16} />}
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              New meeting
+            </Button>
+          </div>
+        </header>
+
+        {/* Calendar Body Stage */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-white">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 text-[#616161] space-y-3">
+              <div className="w-8 h-8 border-2 border-[#5B5FC7] border-t-transparent rounded-full animate-spin" />
+              <p className="text-[13px] font-medium">Loading schedule...</p>
             </div>
-
-            {selectedEvent.description && (
-              <div
-                style={{
-                  backgroundColor: '#0f172a',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                  color: '#cbd5e1',
-                  border: '1px solid rgba(148, 163, 184, 0.1)',
-                }}
-              >
-                {selectedEvent.description}
+          ) : viewMode === 'month' ? (
+            /* ──────────────── MONTH VIEW ──────────────── */
+            <div className="h-full flex flex-col p-4">
+              <div className="grid grid-cols-7 border-b border-[#EDEBE9] pb-2 text-center text-[12.5px] font-bold text-[#616161]">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                  <span key={d}>{d}</span>
+                ))}
               </div>
-            )}
 
-            {/* Attendees list */}
-            {selectedEvent.attendees.length > 0 && (
-              <div>
-                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: '#94a3b8' }}>Attendees ({selectedEvent.attendees.length})</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  {selectedEvent.attendees.map((att) => (
+              <div className="flex-1 grid grid-cols-7 grid-rows-5 gap-px bg-[#EDEBE9] border border-[#EDEBE9] rounded-xl overflow-hidden mt-2 shadow-xs">
+                {(() => {
+                  const year = currentDate.getFullYear();
+                  const month = currentDate.getMonth();
+                  const firstDayIndex = new Date(year, month, 1).getDay();
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const cells = [];
+
+                  for (let i = 0; i < firstDayIndex; i++) {
+                    cells.push(<div key={`lead-${i}`} className="bg-[#FAF9F8] p-2" />);
+                  }
+
+                  for (let day = 1; day <= daysInMonth; day++) {
+                    const cellDate = new Date(year, month, day);
+                    const isToday = cellDate.toDateString() === new Date().toDateString();
+                    const dayEvents = events.filter((ev) => {
+                      const evDate = new Date(ev.startAt);
+                      return evDate.toDateString() === cellDate.toDateString();
+                    });
+
+                    cells.push(
+                      <div
+                        key={day}
+                        onClick={() => handleSlotClick(cellDate, 9)}
+                        className="bg-white p-2 min-h-[100px] flex flex-col justify-between hover:bg-[#F8F8F8] transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold ${
+                              isToday
+                                ? 'bg-[#5B5FC7] text-white shadow-xs'
+                                : 'text-[#242424]'
+                            }`}
+                          >
+                            {day}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 mt-1 overflow-hidden">
+                          {dayEvents.slice(0, 2).map((ev) => (
+                            <div
+                              key={ev.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvent(ev);
+                              }}
+                              className="text-[11px] p-1 rounded bg-[#5B5FC7]/10 text-[#5B5FC7] font-semibold truncate hover:bg-[#5B5FC7]/20 transition-colors"
+                            >
+                              {ev.title}
+                            </div>
+                          ))}
+                          {dayEvents.length > 2 && (
+                            <span className="text-[10px] text-[#616161] font-semibold">
+                              +{dayEvents.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return cells;
+                })()}
+              </div>
+            </div>
+          ) : viewMode === 'week' || viewMode === 'workWeek' ? (
+            /* ──────────────── WEEK & WORK WEEK VIEW ──────────────── */
+            <div className="flex flex-col min-w-[700px]">
+              {/* Day headers */}
+              <div className="flex border-b border-[#EDEBE9] bg-[#FAF9F8] sticky top-0 z-10">
+                <div className="w-[64px] shrink-0 border-r border-[#EDEBE9] p-2 text-right text-[11px] font-semibold text-[#888]">
+                  UTC
+                </div>
+                <div className="flex-1 grid grid-cols-5 md:grid-cols-7 divide-x divide-[#EDEBE9]">
+                  {(() => {
+                    const daysCount = viewMode === 'workWeek' ? 5 : 7;
+                    const startOffset = viewMode === 'workWeek' ? 1 - currentDate.getDay() : -currentDate.getDay();
+                    const dayLabels = [];
+
+                    for (let i = 0; i < daysCount; i++) {
+                      const d = new Date(currentDate);
+                      d.setDate(currentDate.getDate() + startOffset + i);
+                      const isToday = d.toDateString() === new Date().toDateString();
+
+                      dayLabels.push(
+                        <div key={i} className="p-3 text-center">
+                          <span className="text-[11px] font-bold text-[#616161] uppercase block">
+                            {d.toLocaleDateString('default', { weekday: 'short' })}
+                          </span>
+                          <span
+                            className={`inline-block w-7 h-7 rounded-full text-[14px] font-bold leading-7 mt-0.5 ${
+                              isToday ? 'bg-[#5B5FC7] text-white shadow-xs' : 'text-[#242424]'
+                            }`}
+                          >
+                            {d.getDate()}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return dayLabels;
+                  })()}
+                </div>
+              </div>
+
+              {/* Hourly rows (8 AM to 8 PM) */}
+              <div className="divide-y divide-[#EDEBE9]/70">
+                {Array.from({ length: 13 }).map((_, idx) => {
+                  const hour = idx + 8;
+                  const timeLabel = hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
+                  const daysCount = viewMode === 'workWeek' ? 5 : 7;
+                  const startOffset = viewMode === 'workWeek' ? 1 - currentDate.getDay() : -currentDate.getDay();
+
+                  return (
+                    <div key={hour} className="flex min-h-[56px] group">
+                      <div className="w-[64px] shrink-0 border-r border-[#EDEBE9] pr-2.5 pt-1 text-right text-[11px] font-medium text-[#888]">
+                        {timeLabel}
+                      </div>
+
+                      <div className="flex-1 grid grid-cols-5 md:grid-cols-7 divide-x divide-[#EDEBE9]/70">
+                        {Array.from({ length: daysCount }).map((_, dIdx) => {
+                          const slotDate = new Date(currentDate);
+                          slotDate.setDate(currentDate.getDate() + startOffset + dIdx);
+
+                          const slotEvents = events.filter((ev) => {
+                            const evDate = new Date(ev.startAt);
+                            return (
+                              evDate.toDateString() === slotDate.toDateString() &&
+                              evDate.getHours() === hour
+                            );
+                          });
+
+                          return (
+                            <div
+                              key={dIdx}
+                              onClick={() => handleSlotClick(slotDate, hour)}
+                              className="p-1 hover:bg-[#FAF9F8] transition-colors cursor-pointer relative"
+                            >
+                              {slotEvents.map((ev) => (
+                                <div
+                                  key={ev.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedEvent(ev);
+                                  }}
+                                  className="h-full p-2 bg-[#5B5FC7]/15 border-l-3 border-[#5B5FC7] rounded-r-lg text-[#242424] hover:bg-[#5B5FC7]/25 transition-all shadow-2xs"
+                                >
+                                  <div className="text-[12px] font-bold text-[#5B5FC7] truncate">
+                                    {ev.title}
+                                  </div>
+                                  <div className="text-[10.5px] text-[#616161]">
+                                    {new Date(ev.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : viewMode === 'day' ? (
+            /* ──────────────── DAY VIEW ──────────────── */
+            <div className="flex flex-col p-6 max-w-4xl mx-auto">
+              <div className="divide-y divide-[#EDEBE9]">
+                {Array.from({ length: 13 }).map((_, idx) => {
+                  const hour = idx + 8;
+                  const timeLabel = hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
+                  const dayEvents = events.filter((ev) => {
+                    const evDate = new Date(ev.startAt);
+                    return (
+                      evDate.toDateString() === currentDate.toDateString() &&
+                      evDate.getHours() === hour
+                    );
+                  });
+
+                  return (
                     <div
-                      key={att.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.8rem',
-                        padding: '4px 0',
-                      }}
+                      key={hour}
+                      onClick={() => handleSlotClick(currentDate, hour)}
+                      className="flex items-start py-3 hover:bg-[#FAF9F8] px-4 rounded-xl transition-colors cursor-pointer gap-6"
                     >
-                      <span style={{ color: '#f8fafc' }}>{att.user.displayName}</span>
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          backgroundColor:
-                            att.responseStatus === 'ACCEPTED'
-                              ? 'rgba(34, 197, 94, 0.2)'
-                              : att.responseStatus === 'DECLINED'
-                              ? 'rgba(239, 68, 68, 0.2)'
-                              : 'rgba(234, 179, 8, 0.2)',
-                          color:
-                            att.responseStatus === 'ACCEPTED'
-                              ? '#4ade80'
-                              : att.responseStatus === 'DECLINED'
-                              ? '#f87171'
-                              : '#facc15',
+                      <div className="w-[60px] text-[12px] font-bold text-[#616161] pt-1">
+                        {timeLabel}
+                      </div>
+
+                      <div className="flex-1 min-h-[44px]">
+                        {dayEvents.length === 0 ? (
+                          <span className="text-[12px] text-[#C8C6C4] font-medium italic">
+                            Click to schedule a meeting
+                          </span>
+                        ) : (
+                          dayEvents.map((ev) => (
+                            <div
+                              key={ev.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvent(ev);
+                              }}
+                              className="p-3 bg-[#5B5FC7]/10 border-l-4 border-[#5B5FC7] rounded-r-xl flex items-center justify-between"
+                            >
+                              <div>
+                                <h4 className="text-[13px] font-bold text-[#242424]">{ev.title}</h4>
+                                <span className="text-[11px] text-[#616161]">{ev.location || 'Online'}</span>
+                              </div>
+                              <Button
+                                appearance="primary"
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/meetings/room/${ev.meetingId || ev.id}`);
+                                }}
+                              >
+                                Join
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* ──────────────── AGENDA VIEW ──────────────── */
+            <div className="p-8 max-w-3xl mx-auto space-y-4">
+              <h3 className="text-[17px] font-bold text-[#242424] pb-2 border-b border-[#EDEBE9]">
+                Upcoming Meetings ({events.length})
+              </h3>
+              {events.length === 0 ? (
+                <div className="py-16 text-center text-[#616161]">
+                  <PeopleRegular fontSize={32} className="mx-auto text-[#5B5FC7] mb-2" />
+                  <p className="text-[14px] font-medium">No upcoming meetings scheduled.</p>
+                  <Button
+                    appearance="primary"
+                    style={{ marginTop: '12px' }}
+                    onClick={() => setIsCreateModalOpen(true)}
+                  >
+                    Schedule meeting
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {events.map((ev) => (
+                    <div
+                      key={ev.id}
+                      onClick={() => setSelectedEvent(ev)}
+                      className="p-4 rounded-xl border border-[#EDEBE9] hover:shadow-md transition-all flex items-center justify-between cursor-pointer bg-white"
+                    >
+                      <div className="space-y-1">
+                        <h4 className="text-[14px] font-bold text-[#242424]">{ev.title}</h4>
+                        <div className="text-[12px] text-[#616161] flex items-center gap-2">
+                          <ClockRegular fontSize={14} />
+                          <span>{new Date(ev.startAt).toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <Button
+                        appearance="primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/meetings/room/${ev.meetingId || ev.id}`);
                         }}
                       >
-                        {att.responseStatus}
-                      </span>
+                        Join
+                      </Button>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* RSVP Response Actions */}
-            <div
-              style={{
-                borderTop: '1px solid rgba(148, 163, 184, 0.15)',
-                paddingTop: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.5rem',
-              }}
-            >
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8', alignSelf: 'center' }}>RSVP:</span>
-                <button
-                  onClick={() => handleRsvp(selectedEvent.id, 'ACCEPTED')}
-                  style={{
-                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                    color: '#4ade80',
-                    border: '1px solid rgba(34, 197, 94, 0.3)',
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Accept
-                </button>
-                <button
-                  onClick={() => handleRsvp(selectedEvent.id, 'TENTATIVE')}
-                  style={{
-                    backgroundColor: 'rgba(234, 179, 8, 0.15)',
-                    color: '#facc15',
-                    border: '1px solid rgba(234, 179, 8, 0.3)',
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Tentative
-                </button>
-                <button
-                  onClick={() => handleRsvp(selectedEvent.id, 'DECLINED')}
-                  style={{
-                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                    color: '#f87171',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Decline
-                </button>
-              </div>
-
-              {selectedEvent.meeting && (
-                <Link
-                  href={`/meetings?id=${selectedEvent.meeting.id}`}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    textDecoration: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                  }}
-                >
-                  Join Meeting
-                </Link>
               )}
             </div>
-          </div>
+          )}
         </div>
-      )}
 
-      {/* Create Event Modal */}
-      {isCreateModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem',
-          }}
-          onClick={() => setIsCreateModalOpen(false)}
-        >
-          <div
-            style={{
-              backgroundColor: '#1e293b',
-              border: '1px solid rgba(148, 163, 184, 0.25)',
-              borderRadius: '12px',
-              maxWidth: '560px',
-              width: '100%',
-              padding: '1.75rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>
-                Schedule New Event
-              </h2>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.25rem', cursor: 'pointer' }}
-              >
-                &times;
-              </button>
-            </div>
+        {/* ── OFFICIAL FLUENT UI DIALOGS ── */}
 
-            {submitError && (
-              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '0.5rem', borderRadius: '6px', fontSize: '0.8rem' }}>
-                {submitError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {/* Title */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Sprint Review, Team Standup..."
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#0f172a',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '6px',
-                    padding: '8px 10px',
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
-                  }}
-                />
-              </div>
-
-              {/* Start & End Date / Time */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Start</label>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <input
-                      type="date"
-                      value={startDateStr}
-                      onChange={(e) => setStartDateStr(e.target.value)}
-                      style={{ flex: 1, backgroundColor: '#0f172a', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '6px', padding: '6px', color: '#ffffff', fontSize: '0.8rem' }}
+        {/* 1. New Meeting Dialog */}
+        <Dialog open={isCreateModalOpen} onOpenChange={(_, d) => setIsCreateModalOpen(d.open)}>
+          <DialogSurface>
+            <form onSubmit={handleCreateEvent}>
+              <DialogBody>
+                <DialogTitle
+                  action={
+                    <Button
+                      appearance="subtle"
+                      icon={<DismissRegular />}
+                      onClick={() => setIsCreateModalOpen(false)}
+                      aria-label="Close"
                     />
-                    {!allDay && (
-                      <input
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <AddRegular fontSize={20} className="text-[#5B5FC7]" />
+                    <span>New meeting</span>
+                  </div>
+                </DialogTitle>
+
+                <DialogContent className="space-y-4 py-2">
+                  {createError && (
+                    <div className="p-3 bg-[#FDE7E9] text-[#C4314B] rounded-lg text-[12.5px] font-semibold">
+                      {createError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#242424] mb-1">
+                      Title <span className="text-[#C4314B]">*</span>
+                    </label>
+                    <Input
+                      value={title}
+                      onChange={(_, d) => setTitle(d.value)}
+                      placeholder="Add meeting title"
+                      style={{ width: '100%' }}
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">Start date</label>
+                      <Input
+                        type="date"
+                        value={startDateStr}
+                        onChange={(_, d) => setStartDateStr(d.value)}
+                        style={{ width: '100%' }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">Start time</label>
+                      <Input
                         type="time"
                         value={startTimeStr}
-                        onChange={(e) => setStartTimeStr(e.target.value)}
-                        style={{ width: '80px', backgroundColor: '#0f172a', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '6px', padding: '6px', color: '#ffffff', fontSize: '0.8rem' }}
+                        onChange={(_, d) => setStartTimeStr(d.value)}
+                        style={{ width: '100%' }}
+                        required
                       />
-                    )}
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>End</label>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <input
-                      type="date"
-                      value={endDateStr}
-                      onChange={(e) => setEndDateStr(e.target.value)}
-                      style={{ flex: 1, backgroundColor: '#0f172a', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '6px', padding: '6px', color: '#ffffff', fontSize: '0.8rem' }}
-                    />
-                    {!allDay && (
-                      <input
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">End date</label>
+                      <Input
+                        type="date"
+                        value={endDateStr}
+                        onChange={(_, d) => setEndDateStr(d.value)}
+                        style={{ width: '100%' }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">End time</label>
+                      <Input
                         type="time"
                         value={endTimeStr}
-                        onChange={(e) => setEndTimeStr(e.target.value)}
-                        style={{ width: '80px', backgroundColor: '#0f172a', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: '6px', padding: '6px', color: '#ffffff', fontSize: '0.8rem' }}
+                        onChange={(_, d) => setEndTimeStr(d.value)}
+                        style={{ width: '100%' }}
+                        required
                       />
-                    )}
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* All Day Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input
-                  type="checkbox"
-                  id="allDay"
-                  checked={allDay}
-                  onChange={(e) => setAllDay(e.target.checked)}
-                />
-                <label htmlFor="allDay" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>All-day event</label>
-              </div>
+                  <div className="p-3 bg-[#FAF9F8] rounded-xl border border-[#EDEBE9] flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <VideoRegular fontSize={18} className="text-[#5B5FC7]" />
+                      <div>
+                        <div className="text-[13px] font-bold text-[#242424]">Teams meeting</div>
+                        <div className="text-[11px] text-[#616161]">Online audio/video conference link</div>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isOnlineMeeting}
+                      onChange={(e) => setIsOnlineMeeting(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#5B5FC7]"
+                    />
+                  </div>
 
-              {/* Visibility & Recurrence */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Visibility</label>
-                  <select
-                    value={visibility}
-                    onChange={(e) => setVisibility(e.target.value as CalendarEventVisibility)}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#0f172a',
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
-                      borderRadius: '6px',
-                      padding: '8px',
-                      color: '#ffffff',
-                      fontSize: '0.8rem',
-                    }}
-                  >
-                    <option value="ORGANIZATION">Organization</option>
-                    <option value="TEAM">Team</option>
-                    <option value="PRIVATE">Private (Invite only)</option>
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-[12px] font-semibold text-[#616161] mb-1">Description</label>
+                    <textarea
+                      rows={3}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Type details for this new meeting..."
+                      className="w-full px-3 py-2 border border-[#D1D1D1] rounded-lg text-[12.5px] outline-none focus:border-[#5B5FC7] resize-none"
+                    />
+                  </div>
+                </DialogContent>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Recurrence</label>
-                  <select
-                    value={recurrenceRule}
-                    onChange={(e) => setRecurrenceRule(e.target.value)}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#0f172a',
-                      border: '1px solid rgba(148, 163, 184, 0.2)',
-                      borderRadius: '6px',
-                      padding: '8px',
-                      color: '#ffffff',
-                      fontSize: '0.8rem',
-                    }}
-                  >
-                    <option value="none">Does not repeat</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Linked Meeting Checkbox */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(59, 130, 246, 0.08)', padding: '0.6rem', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                <input
-                  type="checkbox"
-                  id="linkMeeting"
-                  checked={linkMeeting}
-                  onChange={(e) => setLinkMeeting(e.target.checked)}
-                />
-                <label htmlFor="linkMeeting" style={{ fontSize: '0.8rem', color: '#60a5fa', fontWeight: 500 }}>
-                  📹 Create and link a TeamTrack Video Meeting room
-                </label>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Location</label>
-                <input
-                  type="text"
-                  placeholder="Conference Room B / Remote link"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#0f172a',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '6px',
-                    padding: '8px 10px',
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
-                  }}
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Description</label>
-                <textarea
-                  rows={2}
-                  placeholder="Meeting agenda, notes..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#0f172a',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '6px',
-                    padding: '8px 10px',
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
-                  }}
-                />
-              </div>
-
-              {/* Reminders dropdown */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>Notification Reminder</label>
-                <select
-                  value={reminderMinutes}
-                  onChange={(e) => setReminderMinutes(parseInt(e.target.value, 10))}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#0f172a',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    borderRadius: '6px',
-                    padding: '8px',
-                    color: '#ffffff',
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  <option value={5}>5 minutes before</option>
-                  <option value={10}>10 minutes before</option>
-                  <option value={15}>15 minutes before</option>
-                  <option value={30}>30 minutes before</option>
-                  <option value={60}>1 hour before</option>
-                  <option value={1440}>1 day before</option>
-                </select>
-              </div>
-
-              {/* Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid rgba(148, 163, 184, 0.2)',
-                    color: '#94a3b8',
-                    borderRadius: '6px',
-                    padding: '6px 14px',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    backgroundColor: '#2563eb',
-                    border: 'none',
-                    color: '#ffffff',
-                    borderRadius: '6px',
-                    padding: '6px 16px',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Save Event
-                </button>
-              </div>
+                <DialogActions>
+                  <Button appearance="secondary" onClick={() => setIsCreateModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button appearance="primary" type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Save'}
+                  </Button>
+                </DialogActions>
+              </DialogBody>
             </form>
-          </div>
-        </div>
-      )}
-    </main>
+          </DialogSurface>
+        </Dialog>
+
+        {/* 2. Meet Now Dialog */}
+        <Dialog open={isMeetNowModalOpen} onOpenChange={(_, d) => setIsMeetNowModalOpen(d.open)}>
+          <DialogSurface>
+            <DialogBody>
+              <DialogTitle
+                action={
+                  <Button
+                    appearance="subtle"
+                    icon={<DismissRegular />}
+                    onClick={() => setIsMeetNowModalOpen(false)}
+                    aria-label="Close"
+                  />
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <VideoRegular fontSize={20} className="text-[#5B5FC7]" />
+                  <span>Start instant meeting</span>
+                </div>
+              </DialogTitle>
+
+              <DialogContent className="py-3 text-[13px] text-[#616161] leading-relaxed">
+                You will be connected to a private meeting room where you can invite others by sharing your link.
+              </DialogContent>
+
+              <DialogActions>
+                <Button appearance="secondary" onClick={() => setIsMeetNowModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button appearance="primary" onClick={handleInstantMeetNow}>
+                  Start meeting
+                </Button>
+              </DialogActions>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
+
+        {/* 3. Event Details Dialog */}
+        <Dialog open={!!selectedEvent} onOpenChange={(_, d) => { if (!d.open) setSelectedEvent(null); }}>
+          <DialogSurface>
+            {selectedEvent && (
+              <DialogBody>
+                <DialogTitle
+                  action={
+                    <Button
+                      appearance="subtle"
+                      icon={<DismissRegular />}
+                      onClick={() => setSelectedEvent(null)}
+                      aria-label="Close"
+                    />
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#5B5FC7]" />
+                    <span>{selectedEvent.title}</span>
+                  </div>
+                </DialogTitle>
+
+                <DialogContent className="space-y-4 py-2 text-[13px]">
+                  <div className="flex items-center gap-2.5 text-[#616161]">
+                    <ClockRegular fontSize={16} />
+                    <span>
+                      {new Date(selectedEvent.startAt).toLocaleString('default', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}{' '}
+                      –{' '}
+                      {new Date(selectedEvent.endAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+
+                  {selectedEvent.location && (
+                    <div className="flex items-center gap-2.5 text-[#616161]">
+                      <LocationRegular fontSize={16} />
+                      <span>{selectedEvent.location}</span>
+                    </div>
+                  )}
+
+                  {selectedEvent.description && (
+                    <div className="p-3 bg-[#FAF9F8] rounded-xl border border-[#EDEBE9] text-[#242424] leading-relaxed">
+                      {selectedEvent.description}
+                    </div>
+                  )}
+                </DialogContent>
+
+                <DialogActions>
+                  <Button
+                    appearance="subtle"
+                    icon={<DeleteRegular fontSize={16} />}
+                    onClick={() => handleDeleteEvent(selectedEvent.id)}
+                    style={{ color: '#C4314B', marginRight: 'auto' }}
+                  >
+                    Cancel meeting
+                  </Button>
+                  <Button appearance="secondary" onClick={() => setSelectedEvent(null)}>
+                    Close
+                  </Button>
+                  <Button
+                    appearance="primary"
+                    onClick={() => router.push(`/meetings/room/${selectedEvent.meetingId || selectedEvent.id}`)}
+                  >
+                    Join
+                  </Button>
+                </DialogActions>
+              </DialogBody>
+            )}
+          </DialogSurface>
+        </Dialog>
+      </div>
+    </TeamsShell>
   );
 }

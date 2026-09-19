@@ -247,6 +247,7 @@ export interface ApiClient {
   syncNotifications(
     query?: NotificationSyncQuery
   ): Promise<ApiResponse<NotificationSyncResponse>>;
+  
 
   // Phase 9D-A: Notification Preferences & Channel Mute
   getNotificationPreferences(): Promise<ApiResponse<UserNotificationPreferences>>;
@@ -396,14 +397,31 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
       headers.set('Authorization', `Bearer ${inMemoryAccessToken}`);
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: isWeb ? 'include' : 'same-origin',
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
 
-    const json = (await response.json()) as ApiResponse<T>;
-    return json;
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+        credentials: isWeb ? 'include' : 'same-origin',
+      });
+      clearTimeout(timeoutId);
+
+      const json = (await response.json()) as ApiResponse<T>;
+      return json;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      return {
+        success: false,
+        error: {
+          code: err?.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR',
+          message: err?.name === 'AbortError' ? 'Request timed out' : (err?.message || 'Network request failed'),
+        },
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   // Single-flight refresh mechanism: concurrent requests share the exact same refresh promise
@@ -542,9 +560,17 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
     },
 
     async getCurrentUser(): Promise<ApiResponse<AuthUser>> {
-      return this.fetchWithAuth<AuthUser>('/api/v1/auth/me', {
+      const res = await this.fetchWithAuth<{ user: AuthUser }>('/api/v1/auth/me', {
         method: 'GET',
       });
+      if (res.success && res.data) {
+        return {
+          success: true,
+          data: res.data.user,
+          timestamp: res.timestamp,
+        };
+      }
+      return res as ApiResponse<any>;
     },
 
     async fetchWithAuth<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {

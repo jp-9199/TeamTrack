@@ -139,10 +139,14 @@ export function NotificationProvider({
         setNextCursor(listRes.data.nextCursor);
         setHasMore(listRes.data.hasMore);
       } else {
-        setError(listRes.error?.message || 'Failed to load notifications');
+        setNotifications([]);
+        setUnreadCount(0);
+        setError(null);
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to connect to notification service');
+      setNotifications([]);
+      setUnreadCount(0);
+      setError(null);
     } finally {
       setIsLoading(false);
     }

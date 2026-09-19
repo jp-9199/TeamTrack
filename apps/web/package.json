@@ -3,15 +3,19 @@
   "version": "0.1.0",
   "description": "TeamTrack Web Application",
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
-    "start": "next start -p 3000",
+    "dev": "node --max-old-space-size=4096 ../../node_modules/next/dist/bin/next dev -p 3000",
+    "build": "node --max-old-space-size=4096 ../../node_modules/next/dist/bin/next build",
+    "start": "node ../../node_modules/next/dist/bin/next start -p 3000",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fluentui/react-components": "^9.74.7",
+    "@fluentui/react-icons": "^2.0.341",
+    "@teamtrack/api-client": "*",
     "@teamtrack/shared-types": "*",
     "@teamtrack/shared-utils": "*",
-    "@teamtrack/api-client": "*",
+    "lottie-react": "^3.1.2",
+    "lucide-react": "^1.46.0",
     "next": "^14.2.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -20,6 +24,9 @@
     "@types/node": "^22.10.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.6.3"
   }
 }

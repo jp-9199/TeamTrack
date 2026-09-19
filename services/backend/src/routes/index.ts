@@ -13,5 +13,7 @@ export { searchRouter } from './search.js';
 export { calendarRouter } from './calendar.js';
 export { aiRouter } from './ai.js';
 export { userRouter } from './users.js';
+export { callsRouter } from './calls.js';
+export { channelFilesRouter } from './channel-files.js';
 
 

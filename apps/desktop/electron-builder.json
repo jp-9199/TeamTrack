@@ -1,0 +1,32 @@
+{
+  "appId": "com.teamtrack.desktop",
+  "productName": "TeamTrack",
+  "electronVersion": "33.2.0",
+  "copyright": "Copyright © 2026 TeamTrack Enterprise",
+  "directories": {
+    "output": "dist-package"
+  },
+  "files": [
+    "dist/**/*",
+    "src/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "TeamTrack"
+  }
+}

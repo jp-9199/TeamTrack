@@ -19,9 +19,14 @@ secrets.json
 
 # Builds
 dist/
+dist-package/
 build/
 out/
 .next/
+*.tsbuildinfo
+*.zip
+*.exe
+
 
 # Logs
 npm-debug.log*

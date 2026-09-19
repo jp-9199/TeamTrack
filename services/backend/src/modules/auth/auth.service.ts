@@ -202,11 +202,11 @@ export class AuthService {
         );
       }
 
-      const accessToken = tokenService.signAccessToken({
-        userId: user.id,
-        sessionId: session.id,
-        email: user.email,
-      });
+          const accessToken = tokenService.signAccessToken({
+            userId: user.id,
+            sessionId: session.id,
+            email: user.email,
+          });
 
       return {
         user: toAuthUser(user),

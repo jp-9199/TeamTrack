@@ -6,6 +6,8 @@ import { wsTicketService, type WsTicketPayload } from './wsTicket.service.js';
 import { subscriptionManager, type AuthenticatedSocket } from './subscription.manager.js';
 import { eventSubscriber } from './event.subscriber.js';
 import { webRtcSignalingService } from './webrtc.signaling.js';
+import { presenceService } from './presence.service.js';
+import { callSignalingService } from './callSignaling.service.js';
 
 const HEARTBEAT_INTERVAL_MS = 30000;
 const MAX_PAYLOAD_BYTES = 64 * 1024; // 64 KB maximum frame size
@@ -87,7 +89,12 @@ export class TeamTrackWebSocketServer {
       }
 
       // Atomically consume ticket
-      const authData = await wsTicketService.consumeTicket(ticket);
+      let authData: WsTicketPayload | null = null;
+      try {
+        authData = await wsTicketService.consumeTicket(ticket);
+      } catch (err) {
+        console.warn('Failed to consume WS ticket:', err);
+      }
       if (!authData) {
         socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
         return;
@@ -231,6 +238,75 @@ export class TeamTrackWebSocketServer {
           break;
         }
 
+        // Presence updates
+        case 'PRESENCE_UPDATE':
+        case 'presence.update': {
+          const status = parsed.status || 'available';
+          const pres = await presenceService.setUserPresence(authSocket.userId, status, parsed.statusMessage, parsed.organizationId);
+          ws.send(JSON.stringify({ type: 'presence.updated', data: pres }));
+          break;
+        }
+
+        case 'presence.get': {
+          const pres = await presenceService.getUserPresence(parsed.userId || authSocket.userId);
+          ws.send(JSON.stringify({ type: 'presence.info', data: pres }));
+          break;
+        }
+
+        // Peer-to-peer Call signaling
+        case 'call.invite': {
+          const res = await callSignalingService.handleCallInvite(authSocket, parsed);
+          if (!res.success) {
+            ws.send(JSON.stringify({ type: 'error', code: res.error || 'CALL_INVITE_FAILED' }));
+          }
+          break;
+        }
+
+        case 'call.accept': {
+          const res = await callSignalingService.handleCallAccept(authSocket, parsed);
+          if (!res.success) {
+            ws.send(JSON.stringify({ type: 'error', code: res.error || 'CALL_ACCEPT_FAILED' }));
+          }
+          break;
+        }
+
+        case 'call.reject': {
+          const res = await callSignalingService.handleCallReject(authSocket, parsed);
+          if (!res.success) {
+            ws.send(JSON.stringify({ type: 'error', code: res.error || 'CALL_REJECT_FAILED' }));
+          }
+          break;
+        }
+
+        case 'call.end': {
+          const res = await callSignalingService.handleCallEnd(authSocket, parsed);
+          if (!res.success) {
+            ws.send(JSON.stringify({ type: 'error', code: res.error || 'CALL_END_FAILED' }));
+          }
+          break;
+        }
+
+        case 'call.signal':
+        case 'call.offer':
+        case 'call.answer':
+        case 'call.ice_candidate': {
+          const res = await callSignalingService.handleSignal(authSocket, parsed.type, parsed);
+          if (!res.success) {
+            ws.send(JSON.stringify({ type: 'error', code: res.error || 'CALL_SIGNAL_FAILED' }));
+          }
+          break;
+        }
+
+        // Meeting Lobby Gatekeeper
+        case 'JOIN_LOBBY':
+        case 'meeting.join_lobby': {
+          if (parsed.meetingId) {
+            await subscriptionManager.subscribe(authSocket, `meeting:${parsed.meetingId}`);
+            ws.send(JSON.stringify({ type: 'LOBBY_JOINED', meetingId: parsed.meetingId, status: 'waiting' }));
+          }
+          break;
+        }
+
         default: {
           ws.send(JSON.stringify({ type: 'error', code: 'UNKNOWN_MESSAGE_TYPE' }));
           break;
@@ -241,11 +317,16 @@ export class TeamTrackWebSocketServer {
     // Cleanup on disconnect or error
     ws.on('close', () => {
       subscriptionManager.removeSocket(authSocket);
+      presenceService.onSocketDisconnected(authSocket.userId).catch(() => {});
     });
 
     ws.on('error', (err) => {
       subscriptionManager.removeSocket(authSocket);
+      presenceService.onSocketDisconnected(authSocket.userId).catch(() => {});
     });
+
+    // Mark user connected in presence service
+    presenceService.onSocketConnected(authData.userId).catch(() => {});
 
     // Send initial connection acknowledgment with authenticated identity
     ws.send(

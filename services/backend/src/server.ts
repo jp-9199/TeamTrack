@@ -18,6 +18,8 @@ import {
   calendarRouter,
   aiRouter,
   userRouter,
+  callsRouter,
+  channelFilesRouter,
 } from './routes/index.js';
 import { webSocketServer } from './realtime/index.js';
 import './modules/calendar/calendarMeeting.listener.js';
@@ -73,6 +75,8 @@ app.use('/api/v1/devices', devicesRouter);
 app.use('/api/v1/search', searchRouter);
 app.use('/api/v1/calendar', calendarRouter);
 app.use('/api/v1/ai', aiRouter);
+app.use('/api/v1/calls', callsRouter);
+app.use('/api/v1/channels/:channelId/files', channelFilesRouter);
 
 // ── Phase 14: Central structured error handler (must be last) ─────────────────
 app.use(errorHandler);

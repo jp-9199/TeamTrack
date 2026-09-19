@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   DEFAULT_BACKEND_PORT,
   DEFAULT_ACCESS_TOKEN_TTL,
@@ -13,6 +15,22 @@ import {
   DEFAULT_LOG_LEVEL,
   ENV_KEYS,
 } from '@teamtrack/config';
+
+// Load .env automatically if present
+for (const envPath of [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '../../.env'),
+]) {
+  if (fs.existsSync(envPath) && typeof process.loadEnvFile === 'function') {
+    try {
+      process.loadEnvFile(envPath);
+      break;
+    } catch {
+      // ignore
+    }
+  }
+}
+
 
 export interface BackendConfig {
   port: number;

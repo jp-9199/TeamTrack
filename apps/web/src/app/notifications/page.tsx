@@ -1,19 +1,30 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { TeamsShell } from '../../components/layout/TeamsShell';
 import { useNotifications } from '../../components/notifications/NotificationContext';
-import { NotificationList } from '../../components/notifications/NotificationList';
-import type { NotificationType } from '@teamtrack/shared-types';
+import { Tooltip } from '@fluentui/react-components';
+import {
+  AlertRegular,
+  AlertFilled,
+  CheckmarkRegular,
+  FilterRegular,
+  SearchRegular,
+  ChatRegular,
+  PeopleTeamRegular,
+  VideoRegular,
+  MoreHorizontalRegular,
+  ArrowClockwiseRegular,
+  DismissRegular,
+} from '@fluentui/react-icons';
 
 const NOTIFICATION_TYPES: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'All Categories' },
   { value: 'mention', label: 'Mentions (@)' },
   { value: 'direct_message', label: 'Direct Messages' },
   { value: 'channel_message', label: 'Channel Messages' },
-  { value: 'reply', label: 'Replies' },
   { value: 'meeting_invite', label: 'Meetings' },
   { value: 'team_activity', label: 'Team Activity' },
-  { value: 'system', label: 'System' },
 ];
 
 export default function NotificationCenterPage() {
@@ -21,19 +32,21 @@ export default function NotificationCenterPage() {
     notifications,
     unreadCount,
     isLoading,
-    isLoadingMore,
-    hasMore,
-    error,
     filter,
     setFilter,
     typeFilter,
     setTypeFilter,
     markAllRead,
-    loadMore,
+    markRead,
     refresh,
   } = useNotifications();
 
-  // Filter items based on active tabs
+  const [selectedNotifId, setSelectedNotifId] = useState<string | null>(
+    notifications[0]?.id || null
+  );
+  const [feedType, setFeedType] = useState<'feed' | 'my_activity'>('feed');
+
+  // Filter items
   const filteredNotifications = notifications.filter((item) => {
     if (filter === 'unread' && item.readAt !== null) {
       return false;
@@ -44,248 +57,236 @@ export default function NotificationCenterPage() {
     return true;
   });
 
-  return (
-    <main
-      style={{
-        maxWidth: '860px',
-        margin: '0 auto',
-        padding: '2rem 1.5rem',
-      }}
-    >
-      {/* Header & Metric Banner */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              margin: '0 0 0.35rem 0',
-              fontSize: '1.75rem',
-              fontWeight: 700,
-              color: '#f8fafc',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Notification Center
-          </h1>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#94a3b8' }}>
-            Stay updated with your mentions, messages, meetings, and team activities.
-          </p>
+  const selectedNotification =
+    filteredNotifications.find((n) => n.id === selectedNotifId) || filteredNotifications[0];
+
+  const renderIcon = (type: string) => {
+    switch (type) {
+      case 'mention':
+        return (
+          <div className="w-8 h-8 rounded-full bg-[#EBEAF9] text-[#5B5FC7] flex items-center justify-center font-bold text-[14px]">
+            @
+          </div>
+        );
+      case 'direct_message':
+      case 'channel_message':
+        return (
+          <div className="w-8 h-8 rounded-full bg-[#E1EDFA] text-[#0078D4] flex items-center justify-center">
+            <ChatRegular fontSize={16} />
+          </div>
+        );
+      case 'meeting_invite':
+        return (
+          <div className="w-8 h-8 rounded-full bg-[#DEF3DF] text-[#107C10] flex items-center justify-center">
+            <VideoRegular fontSize={16} />
+          </div>
+        );
+      default:
+        return (
+          <div className="w-8 h-8 rounded-full bg-[#F3F2F1] text-[#5B5FC7] flex items-center justify-center">
+            <AlertRegular fontSize={16} />
+          </div>
+        );
+    }
+  };
+
+  // ── SECONDARY SIDEBAR: ACTIVITY FEED ──
+  const sidebar = (
+    <div className="flex flex-col h-full bg-[#ECEEF0] select-none text-[#242424]">
+      {/* Sidebar Header */}
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-[18px] font-bold tracking-tight">Activity</h2>
+          <span className="text-[12.5px] text-[#616161]">({feedType === 'feed' ? 'Feed' : 'My Activity'})</span>
         </div>
 
-        {/* Header Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.5rem 0.85rem',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
-              color: '#cbd5e1',
-              fontSize: '0.8125rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'background-color 0.15s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)')}
-          >
-            <span>🔄</span> Refresh
-          </button>
+        <div className="flex items-center gap-1">
+          <Tooltip content="Refresh activity" relationship="label">
+            <button
+              onClick={() => void refresh()}
+              className="p-1.5 hover:bg-black/5 rounded-md text-[#424242] transition-colors cursor-pointer"
+            >
+              <ArrowClockwiseRegular fontSize={16} />
+            </button>
+          </Tooltip>
 
           {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={() => void markAllRead()}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                backgroundColor: '#2563eb',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: '0.8125rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'background-color 0.15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
-            >
-              <span>✓</span> Mark all read ({unreadCount})
-            </button>
+            <Tooltip content="Mark all as read" relationship="label">
+              <button
+                onClick={() => void markAllRead()}
+                className="p-1.5 hover:bg-black/5 rounded-md text-[#5B5FC7] transition-colors cursor-pointer font-bold"
+              >
+                <CheckmarkRegular fontSize={16} />
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>
 
-      {/* Control Bar: Filter Tabs + Category Dropdown */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          padding: '0.75rem 1rem',
-          backgroundColor: 'rgba(30, 41, 59, 0.6)',
-          border: '1px solid rgba(148, 163, 184, 0.15)',
-          borderRadius: '8px 8px 0 0',
-        }}
-      >
-        {/* All vs Unread Filter Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            type="button"
-            onClick={() => setFilter('all')}
-            style={{
-              padding: '0.4rem 0.85rem',
-              borderRadius: '6px',
-              fontSize: '0.8125rem',
-              fontWeight: filter === 'all' ? 600 : 500,
-              color: filter === 'all' ? '#ffffff' : '#94a3b8',
-              backgroundColor: filter === 'all' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-              border: filter === 'all' ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-              cursor: 'pointer',
-            }}
-          >
-            All Notifications ({notifications.length})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFilter('unread')}
-            style={{
-              padding: '0.4rem 0.85rem',
-              borderRadius: '6px',
-              fontSize: '0.8125rem',
-              fontWeight: filter === 'unread' ? 600 : 500,
-              color: filter === 'unread' ? '#ffffff' : '#94a3b8',
-              backgroundColor: filter === 'unread' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-              border: filter === 'unread' ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-              cursor: 'pointer',
-            }}
-          >
-            Unread ({unreadCount})
-          </button>
-        </div>
-
-        {/* Category Filter Select */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <label
-            htmlFor="category-select"
-            style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}
-          >
-            Category:
-          </label>
-          <select
-            id="category-select"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            style={{
-              padding: '0.35rem 0.75rem',
-              backgroundColor: 'rgba(15, 23, 42, 0.8)',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
-              borderRadius: '6px',
-              color: '#f8fafc',
-              fontSize: '0.8125rem',
-              outline: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            {NOTIFICATION_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Main List Container */}
-      <div
-        style={{
-          backgroundColor: 'rgba(15, 23, 42, 0.7)',
-          border: '1px solid rgba(148, 163, 184, 0.15)',
-          borderTop: 'none',
-          borderRadius: '0 0 8px 8px',
-          overflow: 'hidden',
-          minHeight: '280px',
-        }}
-      >
-        <NotificationList
-          notifications={filteredNotifications}
-          isLoading={isLoading}
-          error={error}
-          onRetry={refresh}
-          emptyMessage={
-            filter === 'unread'
-              ? 'No unread notifications right now.'
-              : typeFilter !== 'all'
-              ? 'No notifications found for this category.'
-              : "You're all caught up! No notifications to display."
-          }
-        />
-      </div>
-
-      {/* Pagination Footer */}
-      {hasMore && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginTop: '1.5rem',
-          }}
+      {/* Filter Tabs (All / Unread) */}
+      <div className="flex items-center gap-1 px-3 pb-2.5">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-all border cursor-pointer ${
+            filter === 'all'
+              ? 'bg-white text-[#242424] border-[#B0B5BA] shadow-xs'
+              : 'bg-transparent text-[#424242] border-[#C7CCD1] hover:bg-white/60'
+          }`}
         >
-          <button
-            type="button"
-            onClick={() => void loadMore()}
-            disabled={isLoadingMore}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.65rem 1.5rem',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(148, 163, 184, 0.25)',
-              color: '#f8fafc',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: isLoadingMore ? 'not-allowed' : 'pointer',
-              opacity: isLoadingMore ? 0.7 : 1,
-              transition: 'background-color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (!isLoadingMore) e.currentTarget.style.backgroundColor = 'rgba(51, 65, 85, 0.9)';
-            }}
-            onMouseLeave={(e) => {
-              if (!isLoadingMore) e.currentTarget.style.backgroundColor = 'rgba(30, 41, 59, 0.8)';
-            }}
-          >
-            {isLoadingMore ? (
-              <>
-                <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span> Loading more...
-              </>
-            ) : (
-              'Load More Notifications ↓'
-            )}
-          </button>
-        </div>
-      )}
-    </main>
+          All
+        </button>
+        <button
+          onClick={() => setFilter('unread')}
+          className={`px-3 py-1 rounded-full text-[12px] font-semibold transition-all border cursor-pointer ${
+            filter === 'unread'
+              ? 'bg-white text-[#242424] border-[#B0B5BA] shadow-xs'
+              : 'bg-transparent text-[#424242] border-[#C7CCD1] hover:bg-white/60'
+          }`}
+        >
+          Unread {unreadCount > 0 && `(${unreadCount})`}
+        </button>
+      </div>
+
+      {/* Notifications List */}
+      <div className="flex-1 overflow-y-auto px-1.5 space-y-1 custom-scrollbar">
+        {filteredNotifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 text-center text-[#616161] mt-6">
+            <div className="w-12 h-12 rounded-full bg-black/5 flex items-center justify-center mb-2 text-[#5B5FC7]">
+              <AlertRegular fontSize={24} />
+            </div>
+            <span className="text-[13px] font-bold text-[#242424]">All caught up!</span>
+            <span className="text-[11px] text-[#707070] mt-1">No new notifications in this view.</span>
+          </div>
+        ) : (
+          filteredNotifications.map((notif) => {
+            const isSelected = selectedNotifId === notif.id;
+            const isUnread = !notif.readAt;
+
+            return (
+              <div
+                key={notif.id}
+                onClick={() => {
+                  setSelectedNotifId(notif.id);
+                  if (isUnread) void markRead(notif.id);
+                }}
+                className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-start gap-2.5 select-none ${
+                  isSelected
+                    ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] ring-1 ring-black/5'
+                    : 'hover:bg-black/5'
+                }`}
+              >
+                <div className="relative shrink-0 mt-0.5">
+                  {renderIcon(notif.type)}
+                  {isUnread && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#5B5FC7] ring-2 ring-white" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between mb-0.5">
+                    <span className={`text-[12.5px] truncate ${isUnread ? 'font-bold text-[#242424]' : 'font-semibold text-[#424242]'}`}>
+                      {notif.title}
+                    </span>
+                  </div>
+                  <p className="text-[11.5px] text-[#616161] line-clamp-2 leading-snug">
+                    {notif.body}
+                  </p>
+                  <span className="text-[10px] text-[#8A8886] mt-1 block">
+                    {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <TeamsShell sidebar={sidebar} activeApp="activity">
+      {/* ── ACTIVE CANVAS: NOTIFICATION DETAIL / STAGE ── */}
+      <div className="flex flex-col h-full overflow-hidden bg-white">
+        {selectedNotification ? (
+          <div className="flex flex-col h-full">
+            {/* Notification Header */}
+            <header className="px-8 py-5 border-b border-[#E1DFDD] bg-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                {renderIcon(selectedNotification.type)}
+                <div>
+                  <h1 className="text-[18px] font-bold text-[#242424] leading-tight">
+                    {selectedNotification.title}
+                  </h1>
+                  <p className="text-[12px] text-[#616161]">
+                    {new Date(selectedNotification.createdAt).toLocaleString()} &bull; Category: {selectedNotification.type.replace('_', ' ')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => void markAllRead()}
+                  className="px-3.5 py-1.5 bg-[#5B5FC7] text-white font-semibold text-[12.5px] rounded-lg hover:bg-[#4F52B2] transition-colors cursor-pointer shadow-xs"
+                >
+                  Mark all read
+                </button>
+              </div>
+            </header>
+
+            {/* Notification Detail Body */}
+            <div className="flex-1 overflow-y-auto p-8 bg-[#FAF9F8]">
+              <div className="max-w-2xl bg-white p-6 rounded-2xl border border-[#E1DFDD] shadow-sm space-y-4">
+                <div className="text-[14px] text-[#242424] leading-relaxed whitespace-pre-wrap">
+                  {selectedNotification.body}
+                </div>
+
+                {selectedNotification.resourceType && (
+                  <div className="pt-4 border-t border-[#F3F2F1] flex items-center justify-between">
+                    <span className="text-[12px] text-[#616161]">
+                      Target: <strong className="text-[#242424] capitalize">{selectedNotification.resourceType}</strong>
+                    </span>
+
+                    {selectedNotification.resourceType === 'channel' && (
+                      <a
+                        href="/teams"
+                        className="px-4 py-1.5 bg-[#5B5FC7] text-white rounded-lg text-[12.5px] font-semibold hover:bg-[#4F52B2] shadow-xs"
+                      >
+                        Go to Channel
+                      </a>
+                    )}
+                    {selectedNotification.resourceType === 'conversation' && (
+                      <a
+                        href="/chat"
+                        className="px-4 py-1.5 bg-[#5B5FC7] text-white rounded-lg text-[12.5px] font-semibold hover:bg-[#4F52B2] shadow-xs"
+                      >
+                        Open Chat
+                      </a>
+                    )}
+                    {selectedNotification.resourceType === 'meeting' && (
+                      <a
+                        href={`/meetings/room/${selectedNotification.resourceId}`}
+                        className="px-4 py-1.5 bg-[#107C10] text-white rounded-lg text-[12.5px] font-semibold hover:bg-[#0E6C0E] shadow-xs"
+                      >
+                        Join Meeting
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-[#616161]">
+            <div className="w-16 h-16 rounded-full bg-black/5 flex items-center justify-center mb-3 text-[#5B5FC7]">
+              <AlertRegular fontSize={32} />
+            </div>
+            <h3 className="text-[17px] font-bold text-[#242424]">Select an activity item</h3>
+            <p className="text-[13px] max-w-sm mt-1 text-[#707070]">
+              Mentions, replies, and notifications will show their details here.
+            </p>
+          </div>
+        )}
+      </div>
+    </TeamsShell>
   );
 }

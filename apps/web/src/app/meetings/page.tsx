@@ -1,662 +1,622 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import type {
-  MeetingWithHost,
-  MeetingParticipantWithUser,
-  MeetingStatus,
-  MeetingParticipantStatus,
-} from '@teamtrack/shared-types';
-import { P2PMediaProvider } from '@teamtrack/shared-utils';
-import { createApiClient } from '@teamtrack/api-client';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { TeamsShell } from '../../components/layout/TeamsShell';
+import {
+  Tooltip,
+  Button,
+  Input,
+  Avatar,
+  Badge,
+  Dialog,
+  DialogSurface,
+  DialogTitle,
+  DialogBody,
+  DialogContent,
+  DialogActions,
+  TabList,
+  Tab,
+} from '@fluentui/react-components';
+import {
+  VideoRegular,
+  VideoFilled,
+  AddRegular,
+  ClockRegular,
+  PeopleRegular,
+  SearchRegular,
+  DismissRegular,
+  ShareRegular,
+  LinkRegular,
+  CheckmarkRegular,
+  CalendarRegular,
+} from '@fluentui/react-icons';
+import { useAuth } from '../../components/auth/AuthContext';
+import { api } from '../../lib/api';
+import type { MeetingWithHost } from '@teamtrack/shared-types';
 
 export default function MeetingsPage() {
-  const [baseUrl, setBaseUrl] = useState('http://localhost:4000');
-  const [token, setToken] = useState('');
-  const [orgId, setOrgId] = useState('org_default');
+  const router = useRouter();
+  const { user } = useAuth();
+  const userName = user?.displayName || 'Amir Asad Ullah Khan';
+  const orgId = (user as any)?.organizationId || (user as any)?.activeOrganizationId || 'org_default';
+
+  // ── State Management ──
   const [meetings, setMeetings] = useState<MeetingWithHost[]>([]);
-  const [currentMeeting, setCurrentMeeting] = useState<MeetingWithHost | null>(null);
-  const [participants, setParticipants] = useState<MeetingParticipantWithUser[]>([]);
-  const [myStatus, setMyStatus] = useState<MeetingParticipantStatus | null>(null);
-  const [isHost, setIsHost] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
-  // Form states
-  const [newTitle, setNewTitle] = useState('');
-  const [newWaitingRoom, setNewWaitingRoom] = useState(true);
+  // Dialog States
+  const [isMeetNowOpen, setIsMeetNowOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [isJoinWithIdOpen, setIsJoinWithIdOpen] = useState(false);
 
-  // Media states
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [screenSharing, setScreenSharing] = useState(false);
-  const [handRaised, setHandRaised] = useState(false);
+  // Form States
+  const [meetNowTitle, setMeetNowTitle] = useState(`Meeting with ${userName}`);
+  const [generatedMeetingId, setGeneratedMeetingId] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
 
-  // Connection & Reconnection state
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
-  const [reactions, setReactions] = useState<{ id: string; userId: string; reaction: string }[]>([]);
+  const [joinMeetingId, setJoinMeetingId] = useState('');
+  const [joinPasscode, setJoinPasscode] = useState('');
 
-  // Refs for media and websocket
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const mediaProviderRef = useRef<P2PMediaProvider | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const apiClientRef = useRef(createApiClient({ baseUrl }));
+  const [scheduleTitle, setScheduleTitle] = useState('');
+  const [scheduleDate, setScheduleDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [scheduleTime, setScheduleTime] = useState('14:00');
+  const [waitingRoomEnabled, setWaitingRoomEnabled] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    apiClientRef.current = createApiClient({ baseUrl });
-    if (token) {
-      apiClientRef.current.setAccessToken(token);
-    }
-  }, [baseUrl, token]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      leaveMeeting();
-    };
-  }, []);
-
-  async function loadMeetings() {
-    if (!token || !orgId) return;
+  // ── Fetch Real Meetings from Backend ──
+  const fetchMeetings = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const res = await apiClientRef.current.listMeetings(orgId);
+      const res = await api.listMeetings(orgId);
       if (res.success && res.data) {
-        setMeetings(res.data.meetings);
+        setMeetings(res.data.meetings || []);
       }
     } catch (err) {
-      console.error('Failed to list meetings', err);
+      console.error('Failed to load meetings:', err);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  }, [orgId]);
 
-  async function createMeeting() {
-    if (!token || !newTitle.trim()) return;
+  useEffect(() => {
+    fetchMeetings();
+  }, [fetchMeetings]);
+
+  // Handle Instant Meeting Launch
+  const handleStartInstantMeeting = () => {
+    const roomId = `meet-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    router.push(`/meetings/room/${roomId}`);
+  };
+
+  // Open Meet Now Dialog with generated room ID
+  const handleOpenMeetNow = () => {
+    const roomId = `meet-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    setGeneratedMeetingId(roomId);
+    setMeetNowTitle(`Meeting with ${userName}`);
+    setCopiedLink(false);
+    setIsMeetNowOpen(true);
+  };
+
+  // Copy Meeting Link
+  const handleCopyLink = () => {
+    const fullUrl = `${window.location.origin}/meetings/room/${generatedMeetingId}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  // Handle Join with ID
+  const handleJoinWithId = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinMeetingId.trim()) return;
+    const cleanId = joinMeetingId.trim().replace(/^.*\/meetings\/room\//, '');
+    router.push(`/meetings/room/${encodeURIComponent(cleanId)}`);
+  };
+
+  // Handle Schedule Meeting Submission
+  const handleScheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scheduleTitle.trim()) return;
+
+    setIsSubmitting(true);
     try {
-      const res = await apiClientRef.current.createMeeting({
+      const startDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
+      const endDateTime = new Date(startDateTime.getTime() + 45 * 60 * 1000);
+
+      const res = await api.createMeeting({
         organizationId: orgId,
-        title: newTitle.trim(),
-        waitingRoomEnabled: newWaitingRoom,
+        title: scheduleTitle.trim(),
+        scheduledStartAt: startDateTime.toISOString(),
+        waitingRoomEnabled,
       });
-      if (res.success && res.data) {
-        setNewTitle('');
-        await loadMeetings();
-      }
-    } catch (err) {
-      console.error('Failed to create meeting', err);
-    }
-  }
 
-  async function startMeeting(meetingId: string) {
-    try {
-      const res = await apiClientRef.current.startMeeting(meetingId);
       if (res.success) {
-        await loadMeetings();
+        setIsScheduleOpen(false);
+        setScheduleTitle('');
+        await fetchMeetings();
       }
     } catch (err) {
-      console.error('Failed to start meeting', err);
+      console.error('Failed to schedule meeting:', err);
+    } finally {
+      setIsSubmitting(false);
     }
-  }
+  };
 
-  async function joinMeeting(meeting: MeetingWithHost) {
-    try {
-      const res = await apiClientRef.current.joinMeeting(meeting.id);
-      if (res.success && res.data) {
-        const p = res.data.participant;
-        setCurrentMeeting(meeting);
-        setMyStatus(p.status);
-        setIsHost(p.role === 'host');
-        setAudioEnabled(p.audioEnabled);
-        setVideoEnabled(p.videoEnabled);
-        setHandRaised(p.handRaised);
+  // Filtered Meetings
+  const filteredMeetings = meetings.filter((m) =>
+    m.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-        // Connect WebSocket and initialize media if admitted/joined
-        await setupRealtime(meeting.id);
-        if (p.status === 'joined' || p.status === 'admitted') {
-          await initMedia();
-        }
-        await refreshParticipants(meeting.id);
-      }
-    } catch (err) {
-      console.error('Failed to join meeting', err);
-    }
-  }
+  // ── Render Secondary Sidebar (Pane 2) ──
+  const renderSidebar = () => (
+    <div className="flex flex-col h-full bg-[#ECEEF0] select-none font-sans">
+      {/* Sidebar Header */}
+      <div className="p-4 border-b border-[#E1DFDD]/70">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[17px] font-bold text-[#242424] tracking-tight">Meet</h2>
+        </div>
 
-  async function setupRealtime(meetingId: string) {
-    try {
-      setConnectionStatus('reconnecting');
-      const ticketRes = await apiClientRef.current.createWsTicket();
-      if (!ticketRes.success || !ticketRes.data) {
-        setConnectionStatus('disconnected');
-        return;
-      }
+        {/* Primary Action Buttons */}
+        <div className="flex items-center gap-2 mb-3">
+          <Button
+            appearance="primary"
+            icon={<VideoRegular fontSize={18} />}
+            onClick={handleOpenMeetNow}
+            className="flex-1 text-[13px] font-medium"
+          >
+            Meet now
+          </Button>
+          <Button
+            appearance="secondary"
+            icon={<AddRegular fontSize={18} />}
+            onClick={() => setIsScheduleOpen(true)}
+            className="flex-1 text-[13px] font-medium"
+          >
+            New meeting
+          </Button>
+        </div>
 
-      const ticket = ticketRes.data.ticket;
-      const wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws';
-      const ws = new WebSocket(wsUrl, ['teamtrack-ws', `tt-ticket.${ticket}`]);
+        {/* Search Box */}
+        <Input
+          value={searchQuery}
+          onChange={(_, data) => setSearchQuery(data.value)}
+          contentBefore={<SearchRegular fontSize={15} className="text-[#616161]" />}
+          placeholder="Search meetings..."
+          className="w-full"
+          size="small"
+        />
+      </div>
 
-      ws.onopen = () => {
-        setConnectionStatus('connected');
-        // Subscribe to meeting topic
-        ws.send(JSON.stringify({ type: 'subscribe', topic: `meeting:${meetingId}` }));
-      };
+      {/* Tabs: Upcoming / Past */}
+      <div className="px-3 pt-2 border-b border-[#E1DFDD]/60">
+        <TabList
+          selectedValue={activeTab}
+          onTabSelect={(_, data) => setActiveTab(data.value as 'upcoming' | 'past')}
+          size="small"
+        >
+          <Tab value="upcoming">Upcoming</Tab>
+          <Tab value="past">History</Tab>
+        </TabList>
+      </div>
 
-      ws.onmessage = async (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'event') {
-            handleRealtimeEvent(msg);
-          }
-        } catch {
-          // ignore malformed
-        }
-      };
+      {/* Meeting List or Empty State */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+        {filteredMeetings.length === 0 ? (
+          <div className="text-center py-10 px-4 text-[#616161]">
+            <ClockRegular fontSize={28} className="mx-auto text-[#8A8886] mb-2" />
+            <p className="text-[13px] font-semibold text-[#242424]">No meetings yet</p>
+            <p className="text-[11.5px] text-[#616161] mt-0.5">
+              Start an instant meeting or schedule one to connect.
+            </p>
+          </div>
+        ) : (
+          filteredMeetings.map((meeting) => (
+            <div
+              key={meeting.id}
+              onClick={() => router.push(`/meetings/room/${meeting.id}`)}
+              className="p-2.5 rounded-lg bg-white border border-[#E1DFDD]/60 hover:border-[#5B5FC7] hover:shadow-xs transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[13px] font-semibold text-[#242424] truncate group-hover:text-[#5B5FC7]">
+                  {meeting.title}
+                </span>
+                <Badge
+                  appearance="tint"
+                  color={meeting.status === 'active' ? 'danger' : 'informative'}
+                  size="small"
+                >
+                  {meeting.status}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-[#616161]">
+                <ClockRegular fontSize={13} />
+                <span>
+                  {meeting.scheduledStartAt
+                    ? new Date(meeting.scheduledStartAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'Instant'}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
-      ws.onclose = () => {
-        setConnectionStatus('disconnected');
-      };
-
-      ws.onerror = () => {
-        setConnectionStatus('disconnected');
-      };
-
-      wsRef.current = ws;
-    } catch (err) {
-      setConnectionStatus('disconnected');
-    }
-  }
-
-  async function handleRealtimeEvent(event: any) {
-    const { event: eventName, payload } = event;
-    if (!currentMeeting) return;
-
-    switch (eventName) {
-      case 'meeting.participant.admitted': {
-        await refreshParticipants(currentMeeting.id);
-        if (myStatus === 'waiting') {
-          setMyStatus('joined');
-          await initMedia();
-        }
-        break;
-      }
-      case 'meeting.participant.joined':
-      case 'meeting.participant.left':
-      case 'meeting.participant.removed':
-      case 'meeting.participant.audio_changed':
-      case 'meeting.participant.video_changed':
-      case 'meeting.participant.screen_share_changed':
-      case 'meeting.hand_raised':
-      case 'meeting.hand_lowered':
-      case 'meeting.host_changed': {
-        await refreshParticipants(currentMeeting.id);
-        break;
-      }
-      case 'meeting.reaction': {
-        const id = Math.random().toString(36).substring(7);
-        setReactions((prev) => [...prev, { id, userId: payload.userId, reaction: payload.reactionCode }]);
-        setTimeout(() => {
-          setReactions((prev) => prev.filter((r) => r.id !== id));
-        }, 3000);
-        break;
-      }
-      case 'meeting.ended': {
-        alert('The host has ended this meeting.');
-        leaveMeeting();
-        break;
-      }
-      case 'webrtc.offer':
-      case 'webrtc.answer':
-      case 'webrtc.ice_candidate':
-      case 'webrtc.renegotiate': {
-        if (mediaProviderRef.current && payload.data) {
-          await mediaProviderRef.current.handleRemoteSignal(
-            payload.senderUserId,
-            payload.signalType,
-            payload.data
-          );
-        }
-        break;
-      }
-    }
-  }
-
-  async function initMedia() {
-    if (typeof window === 'undefined') return;
-    try {
-      const provider = new P2PMediaProvider();
-      await provider.initialize({
-        onLocalStream: (stream) => {
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
-        },
-        onSignalingNeeded: (targetUserId, signal) => {
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && currentMeeting) {
-            wsRef.current.send(
-              JSON.stringify({
-                type: `webrtc.${signal.type}`,
-                meetingId: currentMeeting.id,
-                targetUserId,
-                data: signal.data,
-              })
-            );
-          }
-        },
-      });
-
-      await provider.startLocalMedia({ audio: true, video: true });
-      mediaProviderRef.current = provider;
-    } catch (err) {
-      console.warn('Media hardware access deferred or mock environment', err);
-    }
-  }
-
-  async function refreshParticipants(meetingId: string) {
-    try {
-      const res = await apiClientRef.current.listParticipants(meetingId);
-      if (res.success && res.data) {
-        setParticipants(res.data.participants);
-      }
-    } catch (err) {
-      console.error('Failed to list participants', err);
-    }
-  }
-
-  async function toggleMic() {
-    const next = !audioEnabled;
-    setAudioEnabled(next);
-    mediaProviderRef.current?.setAudioEnabled(next);
-    if (currentMeeting) {
-      await apiClientRef.current.updateMediaState(currentMeeting.id, { audioEnabled: next });
-    }
-  }
-
-  async function toggleVideo() {
-    const next = !videoEnabled;
-    setVideoEnabled(next);
-    mediaProviderRef.current?.setVideoEnabled(next);
-    if (currentMeeting) {
-      await apiClientRef.current.updateMediaState(currentMeeting.id, { videoEnabled: next });
-    }
-  }
-
-  async function toggleScreenShare() {
-    if (screenSharing) {
-      mediaProviderRef.current?.stopScreenShare();
-      setScreenSharing(false);
-      if (currentMeeting) {
-        await apiClientRef.current.updateMediaState(currentMeeting.id, { screenSharing: false });
-      }
-    } else {
-      const track = await mediaProviderRef.current?.startScreenShare();
-      if (track) {
-        setScreenSharing(true);
-        if (currentMeeting) {
-          await apiClientRef.current.updateMediaState(currentMeeting.id, { screenSharing: true });
-        }
-      }
-    }
-  }
-
-  async function toggleHand() {
-    const next = !handRaised;
-    setHandRaised(next);
-    if (currentMeeting) {
-      await apiClientRef.current.updateMediaState(currentMeeting.id, { handRaised: next });
-    }
-  }
-
-  function sendReaction(emoji: string) {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && currentMeeting) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'meeting.reaction',
-          meetingId: currentMeeting.id,
-          reaction: emoji,
-        })
-      );
-    }
-  }
-
-  async function admitParticipant(targetUserId: string) {
-    if (!currentMeeting) return;
-    await apiClientRef.current.admitParticipant(currentMeeting.id, targetUserId);
-    await refreshParticipants(currentMeeting.id);
-  }
-
-  async function removeParticipant(targetUserId: string) {
-    if (!currentMeeting) return;
-    await apiClientRef.current.removeParticipant(currentMeeting.id, targetUserId);
-    await refreshParticipants(currentMeeting.id);
-  }
-
-  async function endMeeting() {
-    if (!currentMeeting) return;
-    await apiClientRef.current.endMeeting(currentMeeting.id);
-    leaveMeeting();
-  }
-
-  function leaveMeeting() {
-    if (currentMeeting) {
-      apiClientRef.current.leaveMeeting(currentMeeting.id).catch(() => {});
-    }
-    mediaProviderRef.current?.destroy();
-    mediaProviderRef.current = null;
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setCurrentMeeting(null);
-    setMyStatus(null);
-    setParticipants([]);
-    setConnectionStatus('disconnected');
-  }
+      {/* Join with ID Button at Bottom */}
+      <div className="p-3 border-t border-[#E1DFDD]/70 bg-[#F5F5F5]">
+        <Button
+          appearance="subtle"
+          icon={<LinkRegular fontSize={16} />}
+          onClick={() => setIsJoinWithIdOpen(true)}
+          className="w-full text-[12.5px] justify-start"
+        >
+          Join with a meeting ID
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{ padding: '24px', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '1200px', margin: '0 auto', color: '#1e293b' }}>
-      <header style={{ marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>TeamTrack Meetings (Phase 7)</h1>
-        <p style={{ color: '#64748b', margin: 0 }}>WebRTC Media • Waiting Room • Participant Controls • Realtime Signaling</p>
-      </header>
+    <TeamsShell activeApp="meet" sidebar={renderSidebar()}>
+      <div className="flex-1 flex flex-col h-full bg-[#FAF9F8] overflow-y-auto font-sans">
+        {/* ── Top Hero Canvas ── */}
+        <div className="p-8 max-w-[1000px] w-full mx-auto">
+          <div className="mb-6">
+            <h1 className="text-[24px] font-bold text-[#242424] tracking-tight">Meet</h1>
+            <p className="text-[14px] text-[#616161] mt-1">
+              Start an instant meeting, schedule for later, or join an existing call.
+            </p>
+          </div>
 
-      {/* Auth & Environment Controls */}
-      <section style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block' }}>Backend URL</label>
-            <input
-              type="text"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-            />
+          {/* ── 3 Core Teams Action Cards ── */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {/* Card 1: Meet now */}
+            <div className="bg-white p-5 rounded-xl border border-[#E1DFDD] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="w-[42px] h-[42px] rounded-lg bg-[#5B5FC7]/10 flex items-center justify-center text-[#5B5FC7] mb-3">
+                  <VideoFilled fontSize={24} />
+                </div>
+                <h3 className="text-[15px] font-bold text-[#242424]">Meet now</h3>
+                <p className="text-[12.5px] text-[#616161] mt-1 leading-relaxed">
+                  Start an instant video meeting and invite anyone with a secure link.
+                </p>
+              </div>
+              <div className="pt-4 mt-auto">
+                <Button
+                  appearance="primary"
+                  icon={<VideoRegular fontSize={17} />}
+                  onClick={handleOpenMeetNow}
+                  className="w-full"
+                >
+                  Start meeting
+                </Button>
+              </div>
+            </div>
+
+            {/* Card 2: Join with an ID */}
+            <div className="bg-white p-5 rounded-xl border border-[#E1DFDD] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="w-[42px] h-[42px] rounded-lg bg-[#0078D4]/10 flex items-center justify-center text-[#0078D4] mb-3">
+                  <LinkRegular fontSize={24} />
+                </div>
+                <h3 className="text-[15px] font-bold text-[#242424]">Join with an ID</h3>
+                <p className="text-[12.5px] text-[#616161] mt-1 leading-relaxed">
+                  Have a meeting code or invitation link? Enter it to join immediately.
+                </p>
+              </div>
+              <div className="pt-4 mt-auto">
+                <Button
+                  appearance="secondary"
+                  icon={<LinkRegular fontSize={17} />}
+                  onClick={() => setIsJoinWithIdOpen(true)}
+                  className="w-full"
+                >
+                  Join meeting
+                </Button>
+              </div>
+            </div>
+
+            {/* Card 3: Schedule a meeting */}
+            <div className="bg-white p-5 rounded-xl border border-[#E1DFDD] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="w-[42px] h-[42px] rounded-lg bg-[#107C41]/10 flex items-center justify-center text-[#107C41] mb-3">
+                  <CalendarRegular fontSize={24} />
+                </div>
+                <h3 className="text-[15px] font-bold text-[#242424]">Schedule a meeting</h3>
+                <p className="text-[12.5px] text-[#616161] mt-1 leading-relaxed">
+                  Plan ahead with calendar invites, recurring schedules, and waiting room protection.
+                </p>
+              </div>
+              <div className="pt-4 mt-auto">
+                <Button
+                  appearance="secondary"
+                  icon={<AddRegular fontSize={17} />}
+                  onClick={() => setIsScheduleOpen(true)}
+                  className="w-full"
+                >
+                  Schedule
+                </Button>
+              </div>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block' }}>JWT Access Token</label>
-            <input
-              type="password"
-              placeholder="Paste Bearer Token"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-            />
+
+          {/* ── Upcoming Meetings Section ── */}
+          <div className="bg-white rounded-xl border border-[#E1DFDD] shadow-xs p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-[16px] font-bold text-[#242424]">Scheduled Meetings</h2>
+                <p className="text-[12px] text-[#616161]">
+                  Upcoming calls and team syncs connected to your calendar
+                </p>
+              </div>
+              <Button
+                appearance="subtle"
+                icon={<AddRegular fontSize={16} />}
+                onClick={() => setIsScheduleOpen(true)}
+              >
+                Schedule new
+              </Button>
+            </div>
+
+            {filteredMeetings.length === 0 ? (
+              <div className="text-center py-12 px-4 border border-dashed border-[#E1DFDD] rounded-lg">
+                <VideoRegular fontSize={40} className="mx-auto text-[#A19F9D] mb-3" />
+                <h3 className="text-[15px] font-semibold text-[#242424]">No upcoming meetings</h3>
+                <p className="text-[13px] text-[#616161] max-w-[380px] mx-auto mt-1 mb-4 leading-relaxed">
+                  You have a clean schedule. Start a quick call with your team or plan a future discussion.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    appearance="primary"
+                    icon={<VideoRegular fontSize={17} />}
+                    onClick={handleOpenMeetNow}
+                  >
+                    Meet now
+                  </Button>
+                  <Button
+                    appearance="secondary"
+                    icon={<CalendarRegular fontSize={17} />}
+                    onClick={() => setIsScheduleOpen(true)}
+                  >
+                    Schedule a meeting
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#EDEBE9]">
+                {filteredMeetings.map((meeting) => (
+                  <div
+                    key={meeting.id}
+                    className="py-3.5 flex items-center justify-between hover:bg-[#F9F8F7] px-2 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar
+                        name={meeting.host?.displayName || 'Host'}
+                        size={36}
+                        color="colorful"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[13.5px] font-semibold text-[#242424] truncate">
+                          {meeting.title}
+                        </p>
+                        <p className="text-[12px] text-[#616161]">
+                          Hosted by {meeting.host?.displayName || userName} ·{' '}
+                          {meeting.scheduledStartAt
+                            ? new Date(meeting.scheduledStartAt).toLocaleString([], {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              })
+                            : 'Instant Call'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        appearance="primary"
+                        onClick={() => router.push(`/meetings/room/${meeting.id}`)}
+                      >
+                        Join
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block' }}>Organization ID</label>
-            <input
-              type="text"
-              value={orgId}
-              onChange={(e) => setOrgId(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-            />
-          </div>
-          <button
-            onClick={loadMeetings}
-            style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', alignSelf: 'flex-end' }}
-          >
-            Load Meetings
-          </button>
         </div>
-      </section>
+      </div>
 
-      {!currentMeeting ? (
-        /* Meeting Lobby / Creation */
-        <div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
-            {/* Create Meeting Card */}
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 16px 0' }}>Schedule / Create Meeting</h2>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '14px', marginBottom: '4px' }}>Title</label>
-                <input
-                  type="text"
-                  placeholder="Design Sprint / Standup"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+      {/* ── 1. Meet Now Modal Dialog ── */}
+      <Dialog open={isMeetNowOpen} onOpenChange={(_, data) => setIsMeetNowOpen(data.open)}>
+        <DialogSurface className="max-w-[460px] p-6 rounded-2xl font-sans">
+          <DialogTitle className="text-[18px] font-bold text-[#242424]">
+            Start instant meeting
+          </DialogTitle>
+          <DialogBody>
+            <DialogContent className="py-3 space-y-4">
+              <div>
+                <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
+                  Meeting title
+                </label>
+                <Input
+                  value={meetNowTitle}
+                  onChange={(_, data) => setMeetNowTitle(data.value)}
+                  className="w-full"
+                  placeholder="Meeting title"
                 />
               </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={newWaitingRoom}
-                    onChange={(e) => setNewWaitingRoom(e.target.checked)}
-                  />
-                  Enable Waiting Room
+
+              {/* Shareable Link Box */}
+              <div className="p-3 bg-[#F5F5F5] rounded-lg border border-[#EDEBE9]">
+                <label className="block text-[11.5px] font-semibold text-[#616161] mb-1">
+                  Share this link with others:
                 </label>
-              </div>
-              <button
-                onClick={createMeeting}
-                disabled={!newTitle.trim()}
-                style={{ width: '100%', padding: '10px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-              >
-                Create Meeting
-              </button>
-            </div>
-
-            {/* List Meetings Card */}
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 16px 0' }}>Available Meetings</h2>
-              {meetings.length === 0 ? (
-                <p style={{ color: '#94a3b8' }}>No meetings found for this organization. Create one to get started.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {meetings.map((m) => (
-                    <div
-                      key={m.id}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid #f1f5f9', borderRadius: '6px', background: '#f8fafc' }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{m.title}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
-                          Status: <span style={{ fontWeight: 600, color: m.status === 'active' ? '#059669' : m.status === 'ended' ? '#dc2626' : '#d97706' }}>{m.status.toUpperCase()}</span> • Host: {m.host?.displayName || m.hostId}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        {m.status === 'scheduled' && (
-                          <button
-                            onClick={() => startMeeting(m.id)}
-                            style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                          >
-                            Start
-                          </button>
-                        )}
-                        {m.status !== 'ended' && (
-                          <button
-                            onClick={() => joinMeeting(m)}
-                            style={{ padding: '6px 12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                          >
-                            Join
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      typeof window !== 'undefined'
+                        ? `${window.location.origin}/meetings/room/${generatedMeetingId}`
+                        : `http://localhost:3000/meetings/room/${generatedMeetingId}`
+                    }
+                    className="flex-1 text-[12px] bg-white border border-[#E1DFDD] rounded px-2.5 py-1.5 text-[#242424] select-all outline-none"
+                  />
+                  <Button
+                    appearance={copiedLink ? 'primary' : 'secondary'}
+                    icon={copiedLink ? <CheckmarkRegular fontSize={16} /> : <ShareRegular fontSize={16} />}
+                    onClick={handleCopyLink}
+                  >
+                    {copiedLink ? 'Copied' : 'Copy'}
+                  </Button>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* In-Meeting Room Experience */
-        <div>
-          {/* Top Status Bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', color: '#fff', padding: '12px 20px', borderRadius: '8px 8px 0 0' }}>
-            <div>
-              <span style={{ fontWeight: 700, fontSize: '18px' }}>{currentMeeting.title}</span>
-              <span style={{ marginLeft: '12px', fontSize: '12px', background: '#334155', padding: '2px 8px', borderRadius: '12px' }}>
-                Role: {isHost ? 'Host' : 'Participant'}
-              </span>
-              <span style={{ marginLeft: '8px', fontSize: '12px', background: connectionStatus === 'connected' ? '#059669' : '#d97706', padding: '2px 8px', borderRadius: '12px' }}>
-                {connectionStatus.toUpperCase()}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {isHost && (
-                <button
-                  onClick={endMeeting}
-                  style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  End Meeting
-                </button>
-              )}
-              <button
-                onClick={leaveMeeting}
-                style={{ background: '#475569', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}
+              </div>
+            </DialogContent>
+            <DialogActions className="pt-3 flex justify-end gap-2">
+              <Button appearance="secondary" onClick={() => setIsMeetNowOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                appearance="primary"
+                icon={<VideoRegular fontSize={16} />}
+                onClick={() => router.push(`/meetings/room/${generatedMeetingId}`)}
               >
-                Leave
-              </button>
-            </div>
-          </div>
+                Start meeting
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
 
-          {/* Main Meeting Body */}
-          {myStatus === 'waiting' ? (
-            /* Waiting Room Screen */
-            <div style={{ background: '#1e293b', color: '#f8fafc', padding: '60px 20px', textAlign: 'center', borderRadius: '0 0 8px 8px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '8px' }}>You are in the Waiting Room</h2>
-              <p style={{ color: '#94a3b8', maxWidth: '480px', margin: '0 auto 24px auto' }}>
-                Please wait for the meeting host to admit you. You will not receive audio or video until admitted.
-              </p>
-              <div style={{ display: 'inline-block', width: '32px', height: '32px', border: '3px solid #38bdf8', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            </div>
-          ) : (
-            /* Active Media Stage + Participant Drawer */
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', background: '#1e293b', borderRadius: '0 0 8px 8px', minHeight: '500px' }}>
-              {/* Media Stage */}
-              <div style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                  {/* Local Video Tile */}
-                  <div style={{ position: 'relative', background: '#000', borderRadius: '8px', overflow: 'hidden', minHeight: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      {/* ── 2. Join with ID Modal Dialog ── */}
+      <Dialog open={isJoinWithIdOpen} onOpenChange={(_, data) => setIsJoinWithIdOpen(data.open)}>
+        <DialogSurface className="max-w-[420px] p-6 rounded-2xl font-sans">
+          <DialogTitle className="text-[18px] font-bold text-[#242424]">
+            Join with a meeting ID
+          </DialogTitle>
+          <form onSubmit={handleJoinWithId}>
+            <DialogBody>
+              <DialogContent className="py-3 space-y-3">
+                <div>
+                  <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
+                    Meeting ID or Link
+                  </label>
+                  <Input
+                    value={joinMeetingId}
+                    onChange={(_, data) => setJoinMeetingId(data.value)}
+                    placeholder="e.g. meet-abc-123 or paste room URL"
+                    className="w-full"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
+                    Passcode (Optional)
+                  </label>
+                  <Input
+                    type="password"
+                    value={joinPasscode}
+                    onChange={(_, data) => setJoinPasscode(data.value)}
+                    placeholder="Enter passcode if required"
+                    className="w-full"
+                  />
+                </div>
+              </DialogContent>
+              <DialogActions className="pt-3 flex justify-end gap-2">
+                <Button appearance="secondary" onClick={() => setIsJoinWithIdOpen(false)}>
+                  Cancel
+                </Button>
+                <Button appearance="primary" type="submit" disabled={!joinMeetingId.trim()}>
+                  Join
+                </Button>
+              </DialogActions>
+            </DialogBody>
+          </form>
+        </DialogSurface>
+      </Dialog>
+
+      {/* ── 3. Schedule Meeting Modal Dialog ── */}
+      <Dialog open={isScheduleOpen} onOpenChange={(_, data) => setIsScheduleOpen(data.open)}>
+        <DialogSurface className="max-w-[460px] p-6 rounded-2xl font-sans">
+          <DialogTitle className="text-[18px] font-bold text-[#242424]">
+            Schedule a meeting
+          </DialogTitle>
+          <form onSubmit={handleScheduleSubmit}>
+            <DialogBody>
+              <DialogContent className="py-3 space-y-3.5">
+                <div>
+                  <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
+                    Title
+                  </label>
+                  <Input
+                    value={scheduleTitle}
+                    onChange={(_, data) => setScheduleTitle(data.value)}
+                    placeholder="e.g. Design Sprint / Project Sync"
+                    className="w-full"
+                    autoFocus
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
+                      Date
+                    </label>
+                    <Input
+                      type="date"
+                      value={scheduleDate}
+                      onChange={(_, data) => setScheduleDate(data.value)}
+                      className="w-full"
                     />
-                    <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '12px', padding: '2px 8px', borderRadius: '4px' }}>
-                      You {isHost && '(Host)'} {!audioEnabled && '🔇'} {!videoEnabled && '📷❌'} {handRaised && '✋'}
-                    </div>
                   </div>
-
-                  {/* Remote Participants Tiles */}
-                  {participants
-                    .filter((p) => p.status === 'joined' || p.status === 'admitted')
-                    .map((p) => (
-                      <div
-                        key={p.userId}
-                        style={{ position: 'relative', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', overflow: 'hidden', minHeight: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <div style={{ color: '#94a3b8', textAlign: 'center' }}>
-                          <div style={{ fontSize: '36px', marginBottom: '8px' }}>👤</div>
-                          <div>{p.user?.displayName || p.userId}</div>
-                        </div>
-                        <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '12px', padding: '2px 8px', borderRadius: '4px' }}>
-                          {p.user?.displayName || p.userId} {!p.audioEnabled && '🔇'} {!p.videoEnabled && '📷❌'} {p.handRaised && '✋'}
-                        </div>
-                      </div>
-                    ))}
+                  <div>
+                    <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
+                      Start Time
+                    </label>
+                    <Input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={(_, data) => setScheduleTime(data.value)}
+                      className="w-full"
+                    />
+                  </div>
                 </div>
 
-                {/* Floating Transient Reactions */}
-                <div style={{ position: 'relative', height: '40px', overflow: 'hidden' }}>
-                  {reactions.map((r) => (
-                    <span key={r.id} style={{ display: 'inline-block', fontSize: '24px', marginRight: '12px' }}>
-                      {r.reaction}
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={waitingRoomEnabled}
+                      onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
+                      className="w-4 h-4 text-[#5B5FC7] rounded"
+                    />
+                    <span className="text-[13px] text-[#242424]">
+                      Enable waiting room for guests
                     </span>
-                  ))}
+                  </label>
                 </div>
-
-                {/* Media Control Toolbar */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', padding: '12px', background: '#0f172a', borderRadius: '8px' }}>
-                  <button
-                    onClick={toggleMic}
-                    style={{ padding: '10px 16px', background: audioEnabled ? '#334155' : '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                  >
-                    {audioEnabled ? 'Mute Mic' : 'Unmute Mic'}
-                  </button>
-                  <button
-                    onClick={toggleVideo}
-                    style={{ padding: '10px 16px', background: videoEnabled ? '#334155' : '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                  >
-                    {videoEnabled ? 'Stop Video' : 'Start Video'}
-                  </button>
-                  <button
-                    onClick={toggleScreenShare}
-                    style={{ padding: '10px 16px', background: screenSharing ? '#059669' : '#334155', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                  >
-                    {screenSharing ? 'Stop Sharing' : 'Share Screen'}
-                  </button>
-                  <button
-                    onClick={toggleHand}
-                    style={{ padding: '10px 16px', background: handRaised ? '#d97706' : '#334155', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                  >
-                    {handRaised ? 'Lower Hand' : 'Raise Hand'}
-                  </button>
-                  {/* Reactions */}
-                  {['👍', '👏', '❤️', '🎉', '✋'].map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => sendReaction(emoji)}
-                      style={{ padding: '10px 14px', background: '#334155', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '16px' }}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Participant Drawer & Host Controls */}
-              <div style={{ borderLeft: '1px solid #334155', background: '#0f172a', padding: '16px', color: '#fff' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px 0' }}>
-                  Participants ({participants.length})
-                </h3>
-
-                {/* Waiting Room Section for Host */}
-                {isHost && participants.some((p) => p.status === 'waiting') && (
-                  <div style={{ marginBottom: '20px', background: '#1e293b', padding: '12px', borderRadius: '6px', border: '1px solid #d97706' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#fbbf24', marginBottom: '8px' }}>
-                      Waiting for Admission ({participants.filter((p) => p.status === 'waiting').length})
-                    </div>
-                    {participants
-                      .filter((p) => p.status === 'waiting')
-                      .map((p) => (
-                        <div key={p.userId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '13px' }}>{p.user?.displayName || p.userId}</span>
-                          <button
-                            onClick={() => admitParticipant(p.userId)}
-                            style={{ padding: '4px 8px', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
-                          >
-                            Admit
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                {/* Active Participants List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {participants.map((p) => (
-                    <div key={p.userId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', borderBottom: '1px solid #1e293b', paddingBottom: '6px' }}>
-                      <div>
-                        <div>{p.user?.displayName || p.userId}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>
-                          {p.role} • {p.status} {p.handRaised && '• ✋'}
-                        </div>
-                      </div>
-                      {isHost && p.userId !== currentMeeting.hostId && (
-                        <button
-                          onClick={() => removeParticipant(p.userId)}
-                          style={{ padding: '2px 6px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+              </DialogContent>
+              <DialogActions className="pt-3 flex justify-end gap-2">
+                <Button appearance="secondary" onClick={() => setIsScheduleOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  appearance="primary"
+                  type="submit"
+                  disabled={!scheduleTitle.trim() || isSubmitting}
+                >
+                  {isSubmitting ? 'Scheduling...' : 'Save & Schedule'}
+                </Button>
+              </DialogActions>
+            </DialogBody>
+          </form>
+        </DialogSurface>
+      </Dialog>
+    </TeamsShell>
   );
 }
