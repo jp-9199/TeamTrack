@@ -55,6 +55,15 @@ jobs:
       - name: Monorepo Typecheck
         run: npm run typecheck
 
+      - name: Build Backend
+        run: npm run --workspace=@teamtrack/backend build
+
+      - name: Run Database Migrations
+        run: npm run --workspace=@teamtrack/backend migrate:dev
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://teamtrack:teamtrack_test_password@localhost:5432/teamtrack_test
+
       - name: Run Backend Tests
         run: npm run --workspace=@teamtrack/backend test
         env:
