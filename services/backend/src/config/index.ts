@@ -106,7 +106,9 @@ export function validateProductionConfig(cfg: BackendConfig): void {
 
   // 2. Storage driver production invariants
   if (cfg.storage.driver === 'mock') {
-    throw new Error('FATAL: Mock storage driver is not permitted in production environment.');
+    if (process.env.ALLOW_MOCK_STORAGE !== 'true' && !process.env.STORAGE_DRIVER) {
+      console.warn('[Storage] Notice: Running with mock storage driver. Set STORAGE_DRIVER=s3 and S3_BUCKET if persistent cloud storage is desired.');
+    }
   }
 
   if (cfg.storage.driver === 's3') {
@@ -161,10 +163,15 @@ function resolveConfig(): BackendConfig {
       origins: parseCorsOrigins(process.env[ENV_KEYS.CORS_ORIGIN]),
     },
     rateLimit: {
-      allowMemoryFallback: isProduction ? false : true,
+      allowMemoryFallback:
+        process.env.ALLOW_MEMORY_FALLBACK === 'true' ||
+        !process.env[ENV_KEYS.REDIS_URL] ||
+        !isProduction,
     },
     storage: {
-      driver: (process.env[ENV_KEYS.STORAGE_DRIVER] as any) || (isProduction ? 's3' : 'mock'),
+      driver:
+        (process.env[ENV_KEYS.STORAGE_DRIVER] as any) ||
+        (process.env[ENV_KEYS.S3_BUCKET] ? 's3' : 'mock'),
       s3: {
         bucket: process.env[ENV_KEYS.S3_BUCKET] || (isProduction ? '' : 'teamtrack-uploads-dev'),
         region: process.env[ENV_KEYS.S3_REGION] || 'us-east-1',

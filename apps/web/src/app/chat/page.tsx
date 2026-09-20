@@ -284,8 +284,8 @@ export default function ChatPage() {
     }
   };
 
-  const renderFormattedMessage = (text: string) => {
-    const parts = text.split(/(@[a-zA-Z0-9._-]+)/g);
+  const renderFormattedMessage = (text?: string) => {
+    const parts = (text || '').split(/(@[a-zA-Z0-9._-]+)/g);
     return parts.map((part, index) => {
       if (part.startsWith('@')) {
         return (

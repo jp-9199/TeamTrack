@@ -36,7 +36,14 @@ async function runMigrations() {
   // Create an independent pool specifically for migration
   const pool = new Pool({
     connectionString: config.databaseUrl,
-    ssl: isProduction && !config.databaseUrl.includes('localhost') ? { rejectUnauthorized: false } : undefined,
+    ssl:
+      config.databaseUrl?.includes('sslmode=require') ||
+      config.databaseUrl?.includes('supabase') ||
+      config.databaseUrl?.includes('neon.tech') ||
+      process.env.DATABASE_SSL === 'true' ||
+      (isProduction && !config.databaseUrl.includes('localhost'))
+        ? { rejectUnauthorized: false }
+        : undefined,
     max: 2, // Migration runner only needs 1-2 connections
   });
 

@@ -10,6 +10,8 @@
   ],
   "scripts": {
     "build:packages": "npm run --workspace=@teamtrack/shared-types build && npm run --workspace=@teamtrack/config build && npm run --workspace=@teamtrack/shared-utils build && npm run --workspace=@teamtrack/validation build && npm run --workspace=@teamtrack/api-client build",
+    "build:web": "npm run build:packages && npm run --workspace=@teamtrack/web build",
+    "migrate": "npm run --workspace=@teamtrack/backend migrate",
     "build": "npm run build:packages && npm run --workspace=@teamtrack/backend build && npm run --workspace=@teamtrack/web build && npm run --workspace=@teamtrack/desktop build",
     "typecheck": "npm run --workspace=@teamtrack/shared-types typecheck && npm run --workspace=@teamtrack/config typecheck && npm run --workspace=@teamtrack/shared-utils typecheck && npm run --workspace=@teamtrack/validation typecheck && npm run --workspace=@teamtrack/api-client typecheck && npm run --workspace=@teamtrack/backend typecheck && npm run --workspace=@teamtrack/web typecheck && npm run --workspace=@teamtrack/desktop typecheck && npm run --workspace=@teamtrack/mobile typecheck",
     "test": "npm run --workspace=@teamtrack/backend test && npm run --workspace=@teamtrack/api-client test && npm run --workspace=@teamtrack/desktop test",

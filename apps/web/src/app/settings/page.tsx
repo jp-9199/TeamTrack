@@ -98,9 +98,9 @@ function SettingsContent() {
 
         if (notifRes.status === 'fulfilled' && notifRes.value.success && notifRes.value.data) {
           const np = notifRes.value.data;
-          setDesktopNotifs(np.push_enabled ?? true);
-          setEmailDigests(np.email_enabled ?? false);
-          setSoundAlerts(np.sound_enabled ?? true);
+          setDesktopNotifs(np.pushEnabled ?? true);
+          setEmailDigests(np.emailEnabled ?? false);
+          setSoundAlerts(np.realtimeEnabled ?? true);
         }
       } catch (err) {
         console.error('Failed to load settings from server', err);

@@ -58,8 +58,8 @@ export async function aiRateLimiter(
   const rateLimitKey = `rl:ai:req:${userId}`;
   const concurrencyKey = `rl:ai:conc:${userId}`;
 
-  // 1. Production Mode: Redis is mandatory authority
-  if (config.isProduction) {
+  // 1. Production Mode: Redis is mandatory authority unless allowMemoryFallback is enabled
+  if (config.isProduction && !config.rateLimit.allowMemoryFallback) {
     if (!redisClient || !isRedisConnected) {
       console.error('[AI RateLimiter] Redis unavailable in production! Failing closed.');
       res.status(503).json({

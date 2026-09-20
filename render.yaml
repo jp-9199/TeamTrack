@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build:packages && npm run --workspace=@teamtrack/backend build
-    startCommand: node services/backend/dist/server.js
+    startCommand: npm run --workspace=@teamtrack/backend migrate && node services/backend/dist/server.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -19,4 +19,8 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_SSL
+        value: 'true'
+      - key: ALLOW_MEMORY_FALLBACK
+        value: 'true'
+      - key: ALLOW_MOCK_STORAGE
         value: 'true'

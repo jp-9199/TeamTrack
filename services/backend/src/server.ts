@@ -37,8 +37,15 @@ app.use(requestIdMiddleware);
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow non-browser requests (like curl, mobile native apps) with undefined origin
-      if (!origin || config.cors.origins.includes(origin)) {
+      // Allow non-browser requests, wildcard, Vercel deployments, or explicitly configured origins
+      if (
+        !origin ||
+        config.cors.origins.includes('*') ||
+        config.cors.origins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1')
+      ) {
         callback(null, true);
       } else {
         callback(new Error(`CORS blocked for origin: ${origin}`));

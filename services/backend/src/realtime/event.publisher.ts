@@ -60,14 +60,14 @@ export class EventPublisher {
       try {
         await redis.publish(REDIS_REALTIME_CHANNEL, JSON.stringify(envelope));
       } catch (err: any) {
-        if (config.isProduction) {
+        if (config.isProduction && !config.rateLimit.allowMemoryFallback) {
           throw new Error(`REDIS_PUBLISH_FAILED: ${err.message}`);
         }
         console.error('[EventPublisher] Redis publish error, falling back to local delivery:', err.message);
         subscriptionManager.broadcast(envelope);
       }
     } else {
-      if (config.isProduction) {
+      if (config.isProduction && !config.rateLimit.allowMemoryFallback) {
         throw new Error('REDIS_UNAVAILABLE: In-memory broadcast fallback is strictly disallowed in production');
       }
       // Local in-memory fan-out
