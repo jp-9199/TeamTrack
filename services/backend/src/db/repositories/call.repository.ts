@@ -88,7 +88,7 @@ export class CallRepository {
                call_type AS "callType", direction, status,
                duration_seconds AS "durationSeconds", created_at AS "timestamp"
         FROM call_logs
-        WHERE caller_id = $1 OR callee_id = $1 OR caller_id = 'self' OR callee_id = 'self'
+        WHERE (caller_id = $1 OR callee_id = $1 OR caller_id = 'self' OR callee_id = 'self')
       `;
       const params: any[] = [userId];
 

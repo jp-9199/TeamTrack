@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "node run-tests.mjs",
     "typecheck": "tsc --noEmit",
     "migrate": "node dist/db/migrate.js",
     "migrate:dev": "tsx src/db/migrate.ts"

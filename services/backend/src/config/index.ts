@@ -105,10 +105,8 @@ export function validateProductionConfig(cfg: BackendConfig): void {
   }
 
   // 2. Storage driver production invariants
-  if (cfg.storage.driver === 'mock') {
-    if (process.env.ALLOW_MOCK_STORAGE !== 'true' && !process.env.STORAGE_DRIVER) {
-      console.warn('[Storage] Notice: Running with mock storage driver. Set STORAGE_DRIVER=s3 and S3_BUCKET if persistent cloud storage is desired.');
-    }
+  if (cfg.storage.driver === 'mock' && process.env.ALLOW_MOCK_STORAGE !== 'true') {
+    throw new Error('FATAL: Mock storage driver is not permitted in production environment.');
   }
 
   if (cfg.storage.driver === 's3') {

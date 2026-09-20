@@ -125,6 +125,11 @@ describe('Call Repository & Logs', () => {
   });
 
   test('manages speed dial contacts and enriches with presence', async () => {
+    await callRepository.addSpeedDial('default', {
+      name: 'Bob Test',
+      email: 'bob@test.com',
+      contactUserId: 'user-speeddial-bob',
+    });
     const contacts = await callRepository.listSpeedDial('default');
     assert.ok(Array.isArray(contacts));
     assert.ok(contacts.length > 0);

@@ -69,8 +69,8 @@ export function createRateLimiter(options: RateLimitOptions) {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '127.0.0.1';
     const key = `${options.keyPrefix}:${ip}`;
 
-    // 1. Production Mode: Redis is mandatory authority unless allowMemoryFallback is enabled
-    if (config.isProduction && !config.rateLimit.allowMemoryFallback) {
+    // 1. Production Mode: Redis is mandatory authority unless ALLOW_MEMORY_FALLBACK is explicitly enabled
+    if (config.isProduction && process.env.ALLOW_MEMORY_FALLBACK !== 'true') {
       if (!redisClient || !isRedisConnected) {
         console.error(
           `[CRITICAL ALERT] Redis unavailable in production! Failing closed on rate-limited endpoint ${options.keyPrefix}`
