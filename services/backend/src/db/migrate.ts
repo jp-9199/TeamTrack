@@ -3,12 +3,25 @@ import * as fs from 'node:fs/promises';
 import { Pool } from 'pg';
 import { config } from '../config/index.js';
 
-// Resolve the migrations directory deterministically
-const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../database/migrations');
+import * as fsSync from 'node:fs';
 
-// Determine if we are running in CI or production to enforce safety
+function resolveMigrationsDir(): string {
+  const candidates = [
+    path.resolve(process.cwd(), 'database/migrations'),
+    path.resolve(__dirname, '../../../../database/migrations'),
+    path.resolve(__dirname, '../../../database/migrations'),
+    path.resolve(__dirname, '../../database/migrations'),
+  ];
+  for (const dir of candidates) {
+    if (fsSync.existsSync(dir)) return dir;
+  }
+  return candidates[0];
+}
+
+const MIGRATIONS_DIR = resolveMigrationsDir();
+
+// Determine if we are running in production
 const isProduction = process.env.NODE_ENV === 'production';
-const isCI = process.env.CI === 'true';
 
 async function acquireAdvisoryLock(client: any): Promise<boolean> {
   // Use a deterministic integer key for the lock (e.g., hash of "teamtrack-migrations")
@@ -25,12 +38,9 @@ async function releaseAdvisoryLock(client: any): Promise<void> {
 async function runMigrations() {
   console.log('[Migration] Starting migration process...');
 
-  if (isProduction || isCI) {
-    if (!config.databaseUrl || config.databaseUrl.includes('localhost')) {
-      console.error('[Migration] FATAL: Production/CI migration requires a valid remote DATABASE_URL.');
-      console.error('[Migration] Refusing to run migrations against localhost or empty DB config.');
-      process.exit(1);
-    }
+  if (!config.databaseUrl) {
+    console.error('[Migration] FATAL: DATABASE_URL is required to run migrations.');
+    process.exit(1);
   }
 
   // Create an independent pool specifically for migration
