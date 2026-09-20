@@ -15,6 +15,7 @@ RUN npm ci --workspace=@teamtrack/backend --include-workspace-root
 # Build packages and backend
 RUN npm run build:packages
 RUN npm run --workspace=@teamtrack/backend build
+RUN mkdir -p /app/services/backend/node_modules
 
 # --------------------------------------------------
 # Production Runner Stage
@@ -31,6 +32,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/database ./database
 COPY --from=builder /app/services/backend/package.json ./services/backend/package.json
+COPY --from=builder /app/services/backend/node_modules ./services/backend/node_modules
 COPY --from=builder /app/services/backend/dist ./services/backend/dist
 
 EXPOSE 4000

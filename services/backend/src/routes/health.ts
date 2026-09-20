@@ -57,6 +57,7 @@ const readinessHandler = async (_req: Request, res: Response) => {
 };
 
 // Root mounts
+healthRouter.get('/', livenessHandler);
 healthRouter.get('/health', livenessHandler);
 healthRouter.get('/live', livenessHandler);
 healthRouter.get('/ready', readinessHandler);
