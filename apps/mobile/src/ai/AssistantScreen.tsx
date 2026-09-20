@@ -10,12 +10,14 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import type {
   AIMessage,
   AIActionProposal,
   AIResponse,
 } from '@teamtrack/shared-types';
+import { CopilotIcon } from '../components/MobileIcons';
 
 export interface MobileAssistantScreenProps {
   onSendMessage: (message: string, conversationId?: string) => Promise<AIResponse>;
@@ -23,6 +25,13 @@ export interface MobileAssistantScreenProps {
   onCancelAction: (actionId: string) => Promise<void>;
   onClose: () => void;
 }
+
+const SUGGESTIONS = [
+  { id: '1', title: '📋 Summarize workspace', prompt: 'Summarize today\'s highlights and critical updates across my teams.' },
+  { id: '2', title: '📅 Schedule standup', prompt: 'Schedule a 30-minute Sprint Alignment meeting tomorrow at 2 PM with Sarah and David.' },
+  { id: '3', title: '🚀 Draft release notes', prompt: 'Draft an executive release note celebrating the new Android 16 Mobile & Windows Desktop builds.' },
+  { id: '4', title: '🔒 Security status', prompt: 'Check the security compliance and test suite status across our architecture.' },
+];
 
 export function MobileAssistantScreen({
   onSendMessage,
@@ -37,26 +46,26 @@ export function MobileAssistantScreen({
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
 
-  async function handleSend() {
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
+  async function handleSend(textToSend?: string) {
+    const query = (textToSend || input).trim();
+    if (!query || isLoading) return;
 
     setError(null);
-    setInput('');
+    if (!textToSend) setInput('');
     setIsLoading(true);
 
     const tempUserMsg: AIMessage = {
       id: `temp-${Date.now()}`,
       conversationId: conversationId || 'local',
       role: 'user',
-      content: trimmed,
+      content: query,
       createdAt: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, tempUserMsg]);
 
     try {
-      const res = await onSendMessage(trimmed, conversationId);
+      const res = await onSendMessage(query, conversationId);
       if (!conversationId) {
         setConversationId(res.conversationId);
       }
@@ -106,13 +115,20 @@ export function MobileAssistantScreen({
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
+        {/* ============================================================
+            ANDROID 16 / COPILOT HEADER
+            ============================================================ */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>🤖 AI Assistant</Text>
-            <Text style={styles.headerSubtitle}>Authorized Tools • Zero DB Access</Text>
+          <View style={styles.headerLeft}>
+            <View style={styles.copilotBadge}>
+              <CopilotIcon size={20} focused />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>Copilot AI</Text>
+              <Text style={styles.headerSubtitle}>Enterprise Workspace Intelligence</Text>
+            </View>
           </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton} activeOpacity={0.7}>
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -130,13 +146,24 @@ export function MobileAssistantScreen({
               ]}
             >
               {item.role === 'assistant' && (
-                <Text style={styles.senderLabel}>Assistant</Text>
+                <View style={styles.assistantHeaderRow}>
+                  <CopilotIcon size={16} focused />
+                  <Text style={styles.assistantHeaderLabel}>Copilot</Text>
+                  <Text style={styles.modelTag}>Enterprise Reasoner</Text>
+                </View>
               )}
-              <Text style={styles.messageContent}>{item.content}</Text>
+              <Text
+                style={[
+                  styles.messageContent,
+                  item.role === 'user' ? styles.userContent : styles.assistantContent,
+                ]}
+              >
+                {item.content}
+              </Text>
               {item.toolCalls && item.toolCalls.length > 0 && (
                 <View style={styles.toolBadge}>
                   <Text style={styles.toolBadgeText}>
-                    ⚙️ Executed: {item.toolCalls[0].name}
+                    ⚡ Action Dispatched: {item.toolCalls[0].name}
                   </Text>
                 </View>
               )}
@@ -144,11 +171,28 @@ export function MobileAssistantScreen({
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>✨</Text>
-              <Text style={styles.emptyTitle}>TeamTrack AI Workspace</Text>
+              <View style={styles.emptyIconCircle}>
+                <CopilotIcon size={36} focused />
+              </View>
+              <Text style={styles.emptyTitle}>How can Copilot assist you?</Text>
               <Text style={styles.emptyDescription}>
-                Ask questions, search resources, schedule meetings, or draft messages.
+                Ask questions about your teams, draft executive updates, coordinate meetings, or inspect security invariants.
               </Text>
+
+              {/* Suggestions row */}
+              <View style={styles.suggestionsContainer}>
+                {SUGGESTIONS.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.suggestionCard}
+                    onPress={() => handleSend(item.prompt)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.suggestionTitle}>{item.title}</Text>
+                    <Text style={styles.suggestionPrompt}>{item.prompt}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           }
         />
@@ -156,24 +200,32 @@ export function MobileAssistantScreen({
         {/* Action Proposal Card */}
         {activeProposal && (
           <View style={styles.proposalCard}>
-            <Text style={styles.proposalTitle}>⚠️ Action Confirmation</Text>
+            <View style={styles.proposalHeader}>
+              <Text style={styles.proposalBadge}>Action Required</Text>
+              <Text style={styles.proposalTitle}>{activeProposal.toolName}</Text>
+            </View>
             <Text style={styles.proposalText}>
-              Execute <Text style={styles.bold}>{activeProposal.toolName}</Text>?
+              {activeProposal.summary || 'Copilot is ready to execute this action on your behalf:'}
             </Text>
+            <View style={styles.proposalPayload}>
+              <Text style={styles.payloadCode}>
+                {JSON.stringify(activeProposal.toolArguments, null, 2)}
+              </Text>
+            </View>
             <View style={styles.proposalButtons}>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.confirmBtn]}
                 onPress={handleConfirm}
                 disabled={isLoading}
               >
-                <Text style={styles.btnText}>Confirm</Text>
+                <Text style={styles.confirmBtnText}>✓ Approve & Execute</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.cancelBtn]}
                 onPress={handleCancel}
                 disabled={isLoading}
               >
-                <Text style={styles.btnText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>Dismiss</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -185,27 +237,34 @@ export function MobileAssistantScreen({
           </View>
         )}
 
-        {/* Input Bar */}
+        {/* Android 16 Input Composer Bar */}
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message..."
-            placeholderTextColor="#64748B"
-            value={input}
-            onChangeText={setInput}
-            editable={!isLoading}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]}
-            onPress={handleSend}
-            disabled={!input.trim() || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Text style={styles.sendButtonText}>Send</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.inputPill}>
+            <TextInput
+              style={styles.input}
+              placeholder="Ask Copilot anything..."
+              placeholderTextColor="#9CA3AF"
+              value={input}
+              onChangeText={setInput}
+              editable={!isLoading}
+              multiline
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!input.trim() || isLoading) && styles.sendButtonDisabled,
+              ]}
+              onPress={() => handleSend()}
+              disabled={!input.trim() || isLoading}
+              activeOpacity={0.8}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.sendButtonText}>↑</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -215,7 +274,7 @@ export function MobileAssistantScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8F9FA',
   },
   keyboardView: {
     flex: 1,
@@ -224,178 +283,298 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#E2E8F0',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  copilotBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#18181B',
   },
   headerSubtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#5B5FC7',
   },
   closeButton: {
-    padding: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F4F4F5',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   closeButtonText: {
-    color: '#94A3B8',
-    fontSize: 18,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#71717A',
   },
   messageList: {
     padding: 16,
-    flexGrow: 1,
+    paddingBottom: 24,
   },
   messageBubble: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    maxWidth: '80%',
+    marginVertical: 6,
+    maxWidth: '86%',
+    borderRadius: 20,
+    padding: 14,
   },
   userBubble: {
-    backgroundColor: '#2563EB',
     alignSelf: 'flex-end',
-    borderBottomRightRadius: 2,
+    backgroundColor: '#5B5FC7',
+    borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: '#1E293B',
     alignSelf: 'flex-start',
-    borderBottomLeftRadius: 2,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#E2E8F0',
+    borderBottomLeftRadius: 4,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
-  senderLabel: {
-    fontSize: 11,
+  assistantHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  assistantHeaderLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#18181B',
+  },
+  modelTag: {
+    fontSize: 10,
     fontWeight: '600',
-    color: '#94A3B8',
-    marginBottom: 4,
+    color: '#5B5FC7',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    marginLeft: 4,
   },
   messageContent: {
     fontSize: 14,
-    color: '#F8FAFC',
     lineHeight: 20,
   },
+  userContent: {
+    color: '#FFFFFF',
+  },
+  assistantContent: {
+    color: '#27272A',
+  },
   toolBadge: {
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#F4F4F5',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
   toolBadgeText: {
     fontSize: 11,
-    color: '#38BDF8',
+    fontWeight: '600',
+    color: '#4B5563',
   },
   emptyContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingHorizontal: 12,
   },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#F1F5F9',
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#18181B',
     marginBottom: 6,
+    textAlign: 'center',
   },
   emptyDescription: {
     fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
     lineHeight: 18,
+    color: '#71717A',
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  suggestionsContainer: {
+    width: '100%',
+    gap: 10,
+  },
+  suggestionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 1,
+  },
+  suggestionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#5B5FC7',
+    marginBottom: 4,
+  },
+  suggestionPrompt: {
+    fontSize: 12,
+    color: '#52525B',
+    lineHeight: 16,
   },
   proposalCard: {
-    margin: 16,
-    padding: 14,
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: '#C7D2FE',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 16,
+    elevation: 4,
+    shadowColor: '#5B5FC7',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  proposalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  proposalBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    color: '#B45309',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   proposalTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#F59E0B',
-    marginBottom: 4,
+    fontWeight: '800',
+    color: '#1E1B4B',
   },
   proposalText: {
     fontSize: 13,
-    color: '#F8FAFC',
-    marginBottom: 10,
+    color: '#4B5563',
+    marginBottom: 8,
   },
-  bold: {
-    fontWeight: '700',
+  proposalPayload: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  payloadCode: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    color: '#334155',
   },
   proposalButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   actionBtn: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
   confirmBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#5B5FC7',
+  },
+  confirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   cancelBtn: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#F4F4F5',
   },
-  btnText: {
-    color: '#FFF',
-    fontWeight: '600',
+  cancelBtnText: {
+    color: '#52525B',
     fontSize: 13,
+    fontWeight: '600',
   },
   errorContainer: {
+    backgroundColor: '#FEE2E2',
     marginHorizontal: 16,
-    marginBottom: 8,
     padding: 10,
-    backgroundColor: '#7F1D1D',
-    borderRadius: 6,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   errorText: {
-    color: '#FECACA',
+    color: '#B91C1C',
     fontSize: 12,
+    fontWeight: '600',
   },
   inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#334155',
-    backgroundColor: '#1E293B',
+    borderTopColor: '#E2E8F0',
+  },
+  inputPill: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F4F4F5',
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
   },
   input: {
     flex: 1,
-    backgroundColor: '#0F172A',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: '#F8FAFC',
     fontSize: 14,
-    marginRight: 8,
+    color: '#18181B',
+    maxHeight: 100,
+    paddingVertical: 8,
   },
   sendButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#5B5FC7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: '#475569',
+    backgroundColor: '#E4E4E7',
   },
   sendButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
   },
 });

@@ -47,6 +47,8 @@ export interface NotificationContextValue {
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
+import { useAuth } from '../auth/AuthContext';
+
 export interface NotificationProviderProps {
   children: ReactNode;
   baseUrl?: string;
@@ -57,9 +59,15 @@ export interface NotificationProviderProps {
 export function NotificationProvider({
   children,
   baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-  token = 'demo-user-token',
-  userId = 'demo-user-id',
+  token,
+  userId,
 }: NotificationProviderProps) {
+  const { user } = useAuth();
+  const effectiveToken = typeof window !== 'undefined'
+    ? (localStorage.getItem('teamtrack_access_token') || localStorage.getItem('token') || token || '')
+    : (token || '');
+  const effectiveUserId = user?.id || userId || '';
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -78,7 +86,9 @@ export function NotificationProvider({
 
   // Initialize apiClient and syncManager
   if (!syncManagerRef.current) {
-    apiClientRef.current.setAccessToken(token);
+    if (effectiveToken) {
+      apiClientRef.current.setAccessToken(effectiveToken);
+    }
 
     syncManagerRef.current = new NotificationSyncManager({
       apiClient: apiClientRef.current,
@@ -95,10 +105,10 @@ export function NotificationProvider({
 
   // Synchronize token updates
   useEffect(() => {
-    if (token) {
-      apiClientRef.current.setAccessToken(token);
+    if (effectiveToken) {
+      apiClientRef.current.setAccessToken(effectiveToken);
     }
-  }, [token]);
+  }, [effectiveToken]);
 
   /**
    * Authoritative catch-up sync using Phase 9C contract.
@@ -171,7 +181,9 @@ export function NotificationProvider({
       ws.onopen = () => {
         setWsStatus('connected');
         // Subscribe to user notification channel
-        ws.send(JSON.stringify({ type: 'subscribe', topic: `user:${userId}` }));
+        if (effectiveUserId) {
+          ws.send(JSON.stringify({ type: 'subscribe', topic: `user:${effectiveUserId}` }));
+        }
       };
 
       ws.onmessage = (event) => {
@@ -197,7 +209,7 @@ export function NotificationProvider({
     } catch {
       setWsStatus('disconnected');
     }
-  }, [baseUrl, userId]);
+  }, [baseUrl, effectiveUserId]);
 
   // Initial load and WebSocket connection
   useEffect(() => {

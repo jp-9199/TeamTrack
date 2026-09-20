@@ -16,6 +16,11 @@ userRouter.patch('/me', (req, res) => {
   userController.updateProfile(req, res);
 });
 
+// Search Workspace Users (Directory)
+userRouter.get('/search', (req, res) => {
+  userController.searchUsers(req, res);
+});
+
 // User Security Settings
 userRouter.get('/me/security', (req, res) => {
   userController.getSecurityInfo(req, res);

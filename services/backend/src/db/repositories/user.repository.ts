@@ -166,6 +166,20 @@ export class UserRepository {
       status: user.status,
     };
   }
+
+  async searchUsers(query: string, limit: number = 20, db: Queryable = pool): Promise<DbUser[]> {
+    const term = `%${(query || '').trim().toLowerCase()}%`;
+    const res = await db.query<DbUser>(
+      `SELECT id, email, display_name, full_name, avatar_url,
+              timezone, locale, job_title, status, created_at, updated_at, deleted_at
+       FROM users
+       WHERE (LOWER(email) LIKE $1 OR LOWER(display_name) LIKE $1) AND deleted_at IS NULL
+       ORDER BY display_name ASC
+       LIMIT $2`,
+      [term, limit]
+    );
+    return res.rows;
+  }
 }
 
 export const userRepository = new UserRepository();

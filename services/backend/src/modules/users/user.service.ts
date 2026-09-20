@@ -49,6 +49,13 @@ export class UserService {
     return this.mapUserProfile(user);
   }
 
+  async searchUsers(query: string, currentUserId: string): Promise<UserProfile[]> {
+    const users = await userRepository.searchUsers(query, 20);
+    return users
+      .filter((u) => u.id !== currentUserId)
+      .map((u) => this.mapUserProfile(u));
+  }
+
   async updateProfile(userId: string, input: UpdateUserProfileRequest): Promise<UserProfile> {
     const updated = await userRepository.updateProfile(userId, {
       displayName: input.displayName,

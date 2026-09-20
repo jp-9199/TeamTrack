@@ -20,6 +20,21 @@ export class UserController {
     }
   }
 
+  async searchUsers(req: Request, res: Response): Promise<void> {
+    const currentUserId = (req as any).user.id;
+    const q = (req.query.q as string) || '';
+    try {
+      const users = await userService.searchUsers(q, currentUserId);
+      res.status(200).json({
+        success: true,
+        data: { users },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      this.handleError(res, err);
+    }
+  }
+
   async updateProfile(req: Request, res: Response): Promise<void> {
     const userId = (req as any).user.id;
     const validation = validateUpdateUserProfile(req.body);

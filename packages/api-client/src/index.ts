@@ -398,7 +398,7 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs || 10000);
 
     try {
       const response = await fetch(url, {

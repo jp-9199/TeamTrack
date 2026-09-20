@@ -78,6 +78,10 @@ app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/calls', callsRouter);
 app.use('/api/v1/channels/:channelId/files', channelFilesRouter);
 
+// Fallback aliases for root paths
+app.use('/auth', authRouter);
+app.use('/calls', callsRouter);
+
 // ── Phase 14: Central structured error handler (must be last) ─────────────────
 app.use(errorHandler);
 

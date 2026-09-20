@@ -113,7 +113,10 @@ export function SearchBar() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/v1/search?q=${encodeURIComponent(trimmed)}&limit=7`);
+      const token = typeof window !== 'undefined' ? (localStorage.getItem('teamtrack_access_token') || localStorage.getItem('token') || '') : '';
+      const res = await fetch(`/api/v1/search?q=${encodeURIComponent(trimmed)}&limit=7`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data = await res.json();
       if (data.success && data.data?.items) {
         setResults(data.data.items);

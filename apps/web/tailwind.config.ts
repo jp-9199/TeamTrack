@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,17 +10,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        teams: {
-          purple: "#5b5fc7",
-          purpleHover: "#4f52b2",
-          grayBg: "#f5f5f5",
-          grayBorder: "#e1dfdd",
-          grayHover: "#ebebeb",
-          textLight: "#616161",
-          textDark: "#242424",
-        }
+        studio: {
+          canvas: "var(--bg-canvas)",
+          surface: "var(--bg-surface)",
+          sidebar: "var(--bg-sidebar)",
+          border: "var(--border-subtle)",
+          borderStrong: "var(--border-strong)",
+          brand: "var(--accent-brand)",
+          brandHover: "var(--accent-brand-hover)",
+          brandLight: "var(--accent-brand-light)",
+          cyan: "var(--accent-cyan)",
+          emerald: "var(--accent-emerald)",
+          amber: "var(--accent-amber)",
+          rose: "var(--accent-rose)",
+        },
       },
     },
   },

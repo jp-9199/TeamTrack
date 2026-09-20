@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNotifications } from './NotificationContext';
 import { NotificationList } from './NotificationList';
+import { CheckCheck, RefreshCw, X } from 'lucide-react';
 
 export interface NotificationPopoverProps {
   onNavigate?: (url: string) => void;
@@ -36,7 +37,6 @@ export function NotificationPopover({ onNavigate }: NotificationPopoverProps) {
 
     const handleClickOutside = (e: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        // Only close if target was not the notification bell itself
         const target = e.target as HTMLElement;
         if (!target.closest('#notification-bell-btn')) {
           closePopover();
@@ -55,20 +55,10 @@ export function NotificationPopover({ onNavigate }: NotificationPopoverProps) {
 
   if (!isPopoverOpen) return null;
 
-  // Filter items based on active tab
   const displayedNotifications =
     filter === 'unread'
       ? notifications.filter((n) => n.readAt === null)
       : notifications;
-
-  const handleOpenFullCenter = () => {
-    closePopover();
-    if (onNavigate) {
-      onNavigate('/notifications');
-    } else {
-      window.location.href = '/notifications';
-    }
-  };
 
   return (
     <div
@@ -76,192 +66,87 @@ export function NotificationPopover({ onNavigate }: NotificationPopoverProps) {
       role="dialog"
       aria-label="Notification Center"
       aria-modal="true"
-      style={{
-        position: 'absolute',
-        top: 'calc(100% + 8px)',
-        right: '0',
-        width: '390px',
-        maxWidth: '90vw',
-        maxHeight: '520px',
-        backgroundColor: 'rgba(15, 23, 42, 0.96)',
-        backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(148, 163, 184, 0.2)',
-        borderRadius: '12px',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
+      className="absolute top-11 right-0 w-[380px] max-w-[92vw] max-h-[520px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden animate-scale-in text-slate-800 dark:text-slate-100"
     >
       {/* Popover Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.875rem 1rem',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.1)',
-          backgroundColor: 'rgba(30, 41, 59, 0.6)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#f8fafc' }}>
-            Notifications
-          </h3>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold">Notifications</h3>
           {unreadCount > 0 && (
-            <span
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                padding: '0.1rem 0.5rem',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                color: '#60a5fa',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-              }}
-            >
-              {unreadCount}
+            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+              {unreadCount} new
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="flex items-center gap-1">
           {unreadCount > 0 && (
             <button
               type="button"
               onClick={() => void markAllRead()}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#38bdf8',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-                padding: '0.2rem 0.4rem',
-                borderRadius: '4px',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
             >
-              Mark all read
+              <CheckCheck className="w-3.5 h-3.5" />
+              <span>Mark all read</span>
             </button>
           )}
 
           <button
             type="button"
-            onClick={closePopover}
-            aria-label="Close notifications"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              padding: '0.2rem 0.4rem',
-              borderRadius: '4px',
-            }}
+            onClick={() => void refresh()}
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded cursor-pointer"
+            title="Refresh alerts"
           >
-            ✕
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={closePopover}
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded cursor-pointer"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Filter Tabs (All / Unread) */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          padding: '0.5rem 1rem',
-          backgroundColor: 'rgba(15, 23, 42, 0.4)',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.08)',
-        }}
-      >
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 text-xs">
         <button
-          type="button"
           onClick={() => setFilter('all')}
-          style={{
-            padding: '0.3rem 0.75rem',
-            borderRadius: '6px',
-            fontSize: '0.8rem',
-            fontWeight: filter === 'all' ? 600 : 400,
-            color: filter === 'all' ? '#ffffff' : '#94a3b8',
-            backgroundColor: filter === 'all' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-            border: filter === 'all' ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-            cursor: 'pointer',
-          }}
+          className={`px-3 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+            filter === 'all'
+              ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400'
+              : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
         >
           All ({notifications.length})
         </button>
-
         <button
-          type="button"
           onClick={() => setFilter('unread')}
-          style={{
-            padding: '0.3rem 0.75rem',
-            borderRadius: '6px',
-            fontSize: '0.8rem',
-            fontWeight: filter === 'unread' ? 600 : 400,
-            color: filter === 'unread' ? '#ffffff' : '#94a3b8',
-            backgroundColor: filter === 'unread' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-            border: filter === 'unread' ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-            cursor: 'pointer',
-          }}
+          className={`px-3 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+            filter === 'unread'
+              ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400'
+              : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
         >
           Unread ({unreadCount})
         </button>
       </div>
 
-      {/* Scrollable Notification List */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          maxHeight: '380px',
-        }}
-      >
+      {/* List Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         <NotificationList
           notifications={displayedNotifications}
           isLoading={isLoading}
           error={error}
-          onRetry={refresh}
           onNavigate={(url) => {
             closePopover();
             if (onNavigate) onNavigate(url);
-            else window.location.href = url;
           }}
+          onRetry={() => void refresh()}
           compact
-          emptyMessage={filter === 'unread' ? 'No unread notifications' : "You're all caught up!"}
         />
-      </div>
-
-      {/* Popover Footer */}
-      <div
-        style={{
-          padding: '0.75rem 1rem',
-          borderTop: '1px solid rgba(148, 163, 184, 0.1)',
-          backgroundColor: 'rgba(30, 41, 59, 0.5)',
-          textAlign: 'center',
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleOpenFullCenter}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#38bdf8',
-            fontSize: '0.85rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            padding: '0.2rem 0.5rem',
-            borderRadius: '4px',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-        >
-          View all in Notification Center &rarr;
-        </button>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
 } from '@teamtrack/validation';
 import { fileService } from '../files/file.service.js';
 import { FileServiceError } from '../files/file.errors.js';
+import { notificationService } from '../notifications/notification.service.js';
 
 import type {
   ConversationWithMembers,
@@ -292,6 +293,40 @@ export class ConversationService {
 
     // Post-commit realtime event
     await eventPublisher.publish('message.created', `conversation:${conversationId}`, fullMessage);
+
+    // Phase 9/Requirement 6: Parse @mentions and notify mentioned users
+    const mentionMatches = req.content.match(/@([a-zA-Z0-9._-]+)/g);
+    if (mentionMatches && mentionMatches.length > 0) {
+      try {
+        const members = await conversationRepository.listMembers(conversationId);
+        const sender = members.find((m) => m.userId === senderId);
+        const senderName = sender?.user?.displayName || 'A team member';
+
+        for (const mentionTag of mentionMatches) {
+          const cleanTag = mentionTag.substring(1).toLowerCase();
+          const targetMember = members.find((m) => {
+            if (m.userId === senderId) return false;
+            const userEmail = m.user.email.toLowerCase();
+            const userName = m.user.displayName.toLowerCase().replace(/\s+/g, '');
+            return userEmail.includes(cleanTag) || userName.includes(cleanTag);
+          });
+
+          if (targetMember) {
+            await notificationService.createNotification({
+              recipientId: targetMember.userId,
+              actorId: senderId,
+              type: 'mention',
+              title: `${senderName} mentioned you`,
+              body: req.content,
+              resourceType: 'conversation',
+              resourceId: conversationId,
+            }).catch(() => {});
+          }
+        }
+      } catch (notifErr) {
+        console.warn('[Mentions] Failed to dispatch mention notification:', notifErr);
+      }
+    }
 
     return { message: fullMessage!, isIdempotentRetry: false };
   }

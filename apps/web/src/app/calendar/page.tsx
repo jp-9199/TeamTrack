@@ -3,40 +3,31 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamsShell } from '../../components/layout/TeamsShell';
-import {
-  Tooltip,
-  Button,
-  Input,
-  TabList,
-  Tab,
-  Dialog,
-  DialogSurface,
-  DialogTitle,
-  DialogBody,
-  DialogContent,
-  DialogActions,
-} from '@fluentui/react-components';
-import {
-  ChevronLeftRegular,
-  ChevronRightRegular,
-  AddRegular,
-  VideoRegular,
-  ClockRegular,
-  PeopleRegular,
-  DismissRegular,
-  LocationRegular,
-  DeleteRegular,
-  ShareRegular,
-} from '@fluentui/react-icons';
 import { useAuth } from '../../components/auth/AuthContext';
 import type { CalendarEventWithDetails } from '@teamtrack/shared-types';
+import {
+  CalendarDays,
+  Video,
+  Plus,
+  Clock,
+  MapPin,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Sparkles,
+  Radio,
+  Trash2,
+  ExternalLink,
+  ShieldCheck,
+  Check,
+} from 'lucide-react';
 
 type CalendarViewMode = 'day' | 'workWeek' | 'week' | 'month' | 'agenda';
 
 export default function CalendarPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const userName = user?.displayName || 'Amir Asad Ullah Khan';
 
   // Active view state
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
@@ -100,7 +91,7 @@ export default function CalendarPage() {
 
       const startMonth = startOfWeek.toLocaleString('default', { month: 'short' });
       const endMonth = endOfWeek.toLocaleString('default', { month: 'short' });
-      const title =
+      const computedTitle =
         startMonth === endMonth
           ? `${startMonth} ${startOfWeek.getDate()} – ${endOfWeek.getDate()}, ${startOfWeek.getFullYear()}`
           : `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}, ${endOfWeek.getFullYear()}`;
@@ -108,7 +99,7 @@ export default function CalendarPage() {
       return {
         windowStart: startOfWeek.toISOString(),
         windowEnd: endOfWeek.toISOString(),
-        headerTitle: title,
+        headerTitle: computedTitle,
       };
     } else if (viewMode === 'day') {
       const startOfDay = new Date(currentDate);
@@ -139,11 +130,17 @@ export default function CalendarPage() {
     }
   }, [viewMode, currentDate]);
 
+  // Helper to get real auth token
+  const getAuthToken = () => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('teamtrack_access_token') || localStorage.getItem('token') || '';
+  };
+
   // Fetch real events from backend
   const loadEvents = useCallback(async () => {
     setIsLoading(true);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || 'demo-user-token' : 'demo-user-token';
-    const headers = { Authorization: `Bearer ${token}` };
+    const token = getAuthToken();
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
       const res = await fetch(
@@ -210,19 +207,19 @@ export default function CalendarPage() {
     const startAt = new Date(`${startDateStr}T${startTimeStr}:00`).toISOString();
     const endAt = new Date(`${endDateStr}T${endTimeStr}:00`).toISOString();
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || 'demo-user-token' : 'demo-user-token';
+    const token = getAuthToken();
 
     try {
       const res = await fetch('/api/v1/calendar/events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || undefined,
-          location: isOnlineMeeting ? 'Microsoft Teams Meeting' : location.trim() || undefined,
+          location: isOnlineMeeting ? 'TeamTrack HD Conference' : location.trim() || undefined,
           startAt,
           endAt,
           allDay: false,
@@ -250,12 +247,12 @@ export default function CalendarPage() {
   // Delete event
   const handleDeleteEvent = async (eventId: string) => {
     if (!confirm('Are you sure you want to cancel this meeting?')) return;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || 'demo-user-token' : 'demo-user-token';
+    const token = getAuthToken();
 
     try {
       await fetch(`/api/v1/calendar/events/${eventId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setSelectedEvent(null);
       loadEvents();
@@ -283,67 +280,74 @@ export default function CalendarPage() {
   };
 
   // ─────────────────────────────────────────────────────────────
-  // 1. SECONDARY SIDEBAR: Microsoft Teams Native Calendar Rail
+  // 1. SECONDARY SIDEBAR: TeamTrack Calendar Rail
   // ─────────────────────────────────────────────────────────────
   const calendarSidebar = (
-    <div className="flex flex-col h-full bg-white select-none border-r border-[#EDEBE9] p-4 font-sans">
-      {/* Top Action Buttons: Fluent UI Buttons */}
-      <div className="space-y-2 mb-6">
-        <Button
-          appearance="secondary"
-          icon={<VideoRegular fontSize={18} />}
+    <div className="flex flex-col h-full bg-[var(--bg-surface)] select-none border-r border-[var(--border-subtle)] p-4 font-sans text-[var(--text-primary)]">
+      {/* Top Action Buttons */}
+      <div className="space-y-2 mb-5">
+        <button
           onClick={() => setIsMeetNowModalOpen(true)}
-          style={{ width: '100%', height: '36px' }}
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition-all cursor-pointer shadow-2xs"
         >
-          Meet now
-        </Button>
+          <Video size={15} className="text-indigo-400" />
+          <span>Meet Now</span>
+        </button>
 
-        <Button
-          appearance="primary"
-          icon={<AddRegular fontSize={18} />}
+        <button
           onClick={() => setIsCreateModalOpen(true)}
-          style={{ width: '100%', height: '36px' }}
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-[0.99]"
         >
-          New meeting
-        </Button>
+          <Plus size={15} />
+          <span>New Meeting</span>
+        </button>
+      </div>
+
+      {/* Free Unlocked Pill */}
+      <div className="mb-4 p-2.5 rounded-xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 text-xs flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-indigo-400 font-semibold text-[11px]">
+          <Sparkles size={12} />
+          <span>Unlimited 4K HD Video</span>
+        </div>
+        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 uppercase">
+          Free
+        </span>
       </div>
 
       {/* Mini Month Calendar Picker */}
-      <div className="mb-6 p-2 rounded-xl bg-[#FAF9F8] border border-[#EDEBE9]">
-        <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#EDEBE9]">
-          <span className="text-[13px] font-bold text-[#242424]">
+      <div className="mb-5 p-3 rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)]">
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border-subtle)]">
+          <span className="text-xs font-bold text-[var(--text-primary)]">
             {miniPickerDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
           </span>
           <div className="flex items-center gap-1">
-            <Button
-              appearance="subtle"
-              size="small"
-              icon={<ChevronLeftRegular fontSize={14} />}
+            <button
               onClick={() => {
                 const next = new Date(miniPickerDate);
                 next.setMonth(next.getMonth() - 1);
                 setMiniPickerDate(next);
               }}
-              aria-label="Previous month"
-            />
-            <Button
-              appearance="subtle"
-              size="small"
-              icon={<ChevronRightRegular fontSize={14} />}
+              className="p-1 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
               onClick={() => {
                 const next = new Date(miniPickerDate);
                 next.setMonth(next.getMonth() + 1);
                 setMiniPickerDate(next);
               }}
-              aria-label="Next month"
-            />
+              className="p-1 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+            >
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
 
         {/* Mini 7x6 Grid */}
-        <div className="grid grid-cols-7 gap-1 text-center text-[11px]">
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px]">
           {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-            <span key={i} className="text-[#888] font-bold py-1">
+            <span key={i} className="text-[var(--text-secondary)] font-bold py-1">
               {d}
             </span>
           ))}
@@ -370,10 +374,10 @@ export default function CalendarPage() {
                   onClick={() => setCurrentDate(dateObj)}
                   className={`py-1 rounded-full font-medium transition-colors cursor-pointer ${
                     isSelected
-                      ? 'bg-[#5B5FC7] text-white font-bold'
+                      ? 'bg-indigo-600 text-white font-bold shadow-xs'
                       : isToday
-                      ? 'border border-[#5B5FC7] text-[#5B5FC7] font-bold'
-                      : 'hover:bg-[#EDEBE9] text-[#242424]'
+                      ? 'border border-indigo-500 text-indigo-400 font-bold'
+                      : 'hover:bg-[var(--border-subtle)] text-[var(--text-primary)]'
                   }`}
                 >
                   {day}
@@ -385,24 +389,21 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* My Calendars Checkbox List */}
-      <div className="space-y-3">
-        <h4 className="text-[12px] font-bold uppercase tracking-wider text-[#616161]">My Calendars</h4>
-        <div className="space-y-2 text-[13px] text-[#242424]">
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <input type="checkbox" defaultChecked className="rounded text-[#5B5FC7] focus:ring-0" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#5B5FC7]" />
-            <span className="font-medium">Calendar (TeamTrack)</span>
+      {/* My Calendars List */}
+      <div className="space-y-2.5">
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Schedules</h4>
+        <div className="space-y-1.5 text-xs text-[var(--text-primary)]">
+          <label className="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--border-subtle)]/50">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+            <span className="font-medium text-xs">TeamTrack General</span>
           </label>
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <input type="checkbox" defaultChecked className="rounded text-[#107C10] focus:ring-0" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#107C10]" />
-            <span className="font-medium">Team Meetings</span>
+          <label className="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--border-subtle)]/50">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span className="font-medium text-xs">Team Standups</span>
           </label>
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <input type="checkbox" className="rounded text-[#D83B01] focus:ring-0" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#D83B01]" />
-            <span className="font-medium">Personal Reminders</span>
+          <label className="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-[var(--border-subtle)]/50">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+            <span className="font-medium text-xs">Product Reviews</span>
           </label>
         </div>
       </div>
@@ -410,92 +411,98 @@ export default function CalendarPage() {
   );
 
   // ─────────────────────────────────────────────────────────────
-  // 2. MAIN STAGE: Microsoft Teams Calendar Canvas
+  // 2. MAIN STAGE: Calendar Canvas
   // ─────────────────────────────────────────────────────────────
   return (
     <TeamsShell sidebar={calendarSidebar} activeApp="calendar">
-      <div className="flex flex-col h-full bg-white select-none overflow-hidden font-sans">
+      <div className="flex flex-col h-full bg-[var(--bg-canvas)] select-none overflow-hidden font-sans text-[var(--text-primary)]">
         {/* Top Control Header Bar */}
-        <header className="h-[60px] px-6 border-b border-[#EDEBE9] flex items-center justify-between shrink-0 bg-white z-20">
+        <header className="h-14 px-6 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0 bg-[var(--bg-surface)] z-20">
           {/* Left: Today + Navigation Arrows + Month Heading */}
           <div className="flex items-center gap-3">
-            <Button appearance="secondary" size="small" onClick={handleToday}>
+            <button
+              onClick={handleToday}
+              className="px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
+            >
               Today
-            </Button>
+            </button>
 
             <div className="flex items-center gap-0.5">
-              <Button
-                appearance="subtle"
-                size="small"
-                icon={<ChevronLeftRegular fontSize={18} />}
+              <button
                 onClick={handlePrev}
+                className="p-1.5 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                 aria-label="Previous"
-              />
-              <Button
-                appearance="subtle"
-                size="small"
-                icon={<ChevronRightRegular fontSize={18} />}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
                 onClick={handleNext}
+                className="p-1.5 rounded-lg hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                 aria-label="Next"
-              />
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
 
-            <h2 className="text-[17px] font-bold text-[#242424] tracking-tight ml-2">
+            <h2 className="text-sm font-bold text-[var(--text-primary)] tracking-tight ml-2">
               {headerTitle}
             </h2>
           </div>
 
-          {/* Right: View Switcher TabList & Actions */}
-          <div className="flex items-center gap-3">
-            <TabList
-              selectedValue={viewMode}
-              onTabSelect={(_, data) => setViewMode(data.value as CalendarViewMode)}
-              size="small"
-            >
-              <Tab value="day">Day</Tab>
-              <Tab value="workWeek">Work week</Tab>
-              <Tab value="week">Week</Tab>
-              <Tab value="month">Month</Tab>
-              <Tab value="agenda">Agenda</Tab>
-            </TabList>
+          {/* Right: View Switcher & Action Buttons */}
+          <div className="flex items-center gap-2.5">
+            {/* View switcher pills */}
+            <div className="flex items-center p-0.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] text-xs font-medium">
+              {(['day', 'workWeek', 'week', 'month', 'agenda'] as CalendarViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-2.5 py-1 rounded-lg transition-all capitalize cursor-pointer ${
+                    viewMode === mode
+                      ? 'bg-indigo-600 text-white font-bold shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {mode === 'workWeek' ? 'Work Week' : mode}
+                </button>
+              ))}
+            </div>
 
-            <Button
-              appearance="secondary"
-              size="medium"
-              icon={<VideoRegular fontSize={16} />}
+            <button
               onClick={() => setIsMeetNowModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
             >
-              Meet now
-            </Button>
+              <Video size={14} className="text-indigo-400" />
+              <span>Meet Now</span>
+            </button>
 
-            <Button
-              appearance="primary"
-              size="medium"
-              icon={<AddRegular fontSize={16} />}
+            <button
               onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer shadow-sm"
             >
-              New meeting
-            </Button>
+              <Plus size={14} />
+              <span>New Meeting</span>
+            </button>
           </div>
         </header>
 
         {/* Calendar Body Stage */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-white">
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-[var(--bg-canvas)]">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-24 text-[#616161] space-y-3">
-              <div className="w-8 h-8 border-2 border-[#5B5FC7] border-t-transparent rounded-full animate-spin" />
-              <p className="text-[13px] font-medium">Loading schedule...</p>
+            <div className="flex flex-col items-center justify-center py-24 text-[var(--text-secondary)] space-y-3">
+              <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-medium">Loading schedule...</p>
             </div>
           ) : viewMode === 'month' ? (
             /* ──────────────── MONTH VIEW ──────────────── */
             <div className="h-full flex flex-col p-4">
-              <div className="grid grid-cols-7 border-b border-[#EDEBE9] pb-2 text-center text-[12.5px] font-bold text-[#616161]">
+              <div className="grid grid-cols-7 border-b border-[var(--border-subtle)] pb-2 text-center text-xs font-bold text-[var(--text-secondary)]">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                   <span key={d}>{d}</span>
                 ))}
               </div>
 
-              <div className="flex-1 grid grid-cols-7 grid-rows-5 gap-px bg-[#EDEBE9] border border-[#EDEBE9] rounded-xl overflow-hidden mt-2 shadow-xs">
+              <div className="flex-1 grid grid-cols-7 grid-rows-5 gap-px bg-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden mt-2 shadow-xs">
                 {(() => {
                   const year = currentDate.getFullYear();
                   const month = currentDate.getMonth();
@@ -504,7 +511,7 @@ export default function CalendarPage() {
                   const cells = [];
 
                   for (let i = 0; i < firstDayIndex; i++) {
-                    cells.push(<div key={`lead-${i}`} className="bg-[#FAF9F8] p-2" />);
+                    cells.push(<div key={`lead-${i}`} className="bg-[var(--bg-surface)]/50 p-2" />);
                   }
 
                   for (let day = 1; day <= daysInMonth; day++) {
@@ -519,14 +526,14 @@ export default function CalendarPage() {
                       <div
                         key={day}
                         onClick={() => handleSlotClick(cellDate, 9)}
-                        className="bg-white p-2 min-h-[100px] flex flex-col justify-between hover:bg-[#F8F8F8] transition-colors cursor-pointer group"
+                        className="bg-[var(--bg-surface)] p-2 min-h-[100px] flex flex-col justify-between hover:bg-[var(--border-subtle)]/40 transition-colors cursor-pointer group"
                       >
                         <div className="flex items-center justify-between">
                           <span
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold ${
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                               isToday
-                                ? 'bg-[#5B5FC7] text-white shadow-xs'
-                                : 'text-[#242424]'
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'text-[var(--text-primary)]'
                             }`}
                           >
                             {day}
@@ -541,13 +548,13 @@ export default function CalendarPage() {
                                 e.stopPropagation();
                                 setSelectedEvent(ev);
                               }}
-                              className="text-[11px] p-1 rounded bg-[#5B5FC7]/10 text-[#5B5FC7] font-semibold truncate hover:bg-[#5B5FC7]/20 transition-colors"
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-500/15 text-indigo-400 font-semibold truncate hover:bg-indigo-500/25 transition-colors border border-indigo-500/20"
                             >
                               {ev.title}
                             </div>
                           ))}
                           {dayEvents.length > 2 && (
-                            <span className="text-[10px] text-[#616161] font-semibold">
+                            <span className="text-[9px] text-[var(--text-secondary)] font-semibold">
                               +{dayEvents.length - 2} more
                             </span>
                           )}
@@ -563,11 +570,11 @@ export default function CalendarPage() {
             /* ──────────────── WEEK & WORK WEEK VIEW ──────────────── */
             <div className="flex flex-col min-w-[700px]">
               {/* Day headers */}
-              <div className="flex border-b border-[#EDEBE9] bg-[#FAF9F8] sticky top-0 z-10">
-                <div className="w-[64px] shrink-0 border-r border-[#EDEBE9] p-2 text-right text-[11px] font-semibold text-[#888]">
+              <div className="flex border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] sticky top-0 z-10">
+                <div className="w-16 shrink-0 border-r border-[var(--border-subtle)] p-2 text-right text-[10px] font-semibold text-[var(--text-secondary)]">
                   UTC
                 </div>
-                <div className="flex-1 grid grid-cols-5 md:grid-cols-7 divide-x divide-[#EDEBE9]">
+                <div className="flex-1 grid grid-cols-5 md:grid-cols-7 divide-x divide-[var(--border-subtle)]">
                   {(() => {
                     const daysCount = viewMode === 'workWeek' ? 5 : 7;
                     const startOffset = viewMode === 'workWeek' ? 1 - currentDate.getDay() : -currentDate.getDay();
@@ -579,13 +586,13 @@ export default function CalendarPage() {
                       const isToday = d.toDateString() === new Date().toDateString();
 
                       dayLabels.push(
-                        <div key={i} className="p-3 text-center">
-                          <span className="text-[11px] font-bold text-[#616161] uppercase block">
+                        <div key={i} className="p-2.5 text-center">
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase block">
                             {d.toLocaleDateString('default', { weekday: 'short' })}
                           </span>
                           <span
-                            className={`inline-block w-7 h-7 rounded-full text-[14px] font-bold leading-7 mt-0.5 ${
-                              isToday ? 'bg-[#5B5FC7] text-white shadow-xs' : 'text-[#242424]'
+                            className={`inline-block w-6 h-6 rounded-full text-xs font-bold leading-6 mt-0.5 ${
+                              isToday ? 'bg-indigo-600 text-white shadow-xs' : 'text-[var(--text-primary)]'
                             }`}
                           >
                             {d.getDate()}
@@ -599,7 +606,7 @@ export default function CalendarPage() {
               </div>
 
               {/* Hourly rows (8 AM to 8 PM) */}
-              <div className="divide-y divide-[#EDEBE9]/70">
+              <div className="divide-y divide-[var(--border-subtle)]/70">
                 {Array.from({ length: 13 }).map((_, idx) => {
                   const hour = idx + 8;
                   const timeLabel = hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
@@ -608,11 +615,11 @@ export default function CalendarPage() {
 
                   return (
                     <div key={hour} className="flex min-h-[56px] group">
-                      <div className="w-[64px] shrink-0 border-r border-[#EDEBE9] pr-2.5 pt-1 text-right text-[11px] font-medium text-[#888]">
+                      <div className="w-16 shrink-0 border-r border-[var(--border-subtle)] pr-2.5 pt-1 text-right text-[10px] font-medium text-[var(--text-secondary)]">
                         {timeLabel}
                       </div>
 
-                      <div className="flex-1 grid grid-cols-5 md:grid-cols-7 divide-x divide-[#EDEBE9]/70">
+                      <div className="flex-1 grid grid-cols-5 md:grid-cols-7 divide-x divide-[var(--border-subtle)]/70">
                         {Array.from({ length: daysCount }).map((_, dIdx) => {
                           const slotDate = new Date(currentDate);
                           slotDate.setDate(currentDate.getDate() + startOffset + dIdx);
@@ -629,7 +636,7 @@ export default function CalendarPage() {
                             <div
                               key={dIdx}
                               onClick={() => handleSlotClick(slotDate, hour)}
-                              className="p-1 hover:bg-[#FAF9F8] transition-colors cursor-pointer relative"
+                              className="p-1 hover:bg-[var(--border-subtle)]/30 transition-colors cursor-pointer relative"
                             >
                               {slotEvents.map((ev) => (
                                 <div
@@ -638,12 +645,12 @@ export default function CalendarPage() {
                                     e.stopPropagation();
                                     setSelectedEvent(ev);
                                   }}
-                                  className="h-full p-2 bg-[#5B5FC7]/15 border-l-3 border-[#5B5FC7] rounded-r-lg text-[#242424] hover:bg-[#5B5FC7]/25 transition-all shadow-2xs"
+                                  className="h-full p-2 bg-indigo-500/15 border-l-2 border-indigo-500 rounded-r-xl text-[var(--text-primary)] hover:bg-indigo-500/25 transition-all shadow-2xs"
                                 >
-                                  <div className="text-[12px] font-bold text-[#5B5FC7] truncate">
+                                  <div className="text-[11px] font-bold text-indigo-400 truncate">
                                     {ev.title}
                                   </div>
-                                  <div className="text-[10.5px] text-[#616161]">
+                                  <div className="text-[9px] text-[var(--text-secondary)]">
                                     {new Date(ev.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </div>
                                 </div>
@@ -660,7 +667,7 @@ export default function CalendarPage() {
           ) : viewMode === 'day' ? (
             /* ──────────────── DAY VIEW ──────────────── */
             <div className="flex flex-col p-6 max-w-4xl mx-auto">
-              <div className="divide-y divide-[#EDEBE9]">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {Array.from({ length: 13 }).map((_, idx) => {
                   const hour = idx + 8;
                   const timeLabel = hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
@@ -676,15 +683,15 @@ export default function CalendarPage() {
                     <div
                       key={hour}
                       onClick={() => handleSlotClick(currentDate, hour)}
-                      className="flex items-start py-3 hover:bg-[#FAF9F8] px-4 rounded-xl transition-colors cursor-pointer gap-6"
+                      className="flex items-start py-3 hover:bg-[var(--border-subtle)]/30 px-4 rounded-xl transition-colors cursor-pointer gap-6"
                     >
-                      <div className="w-[60px] text-[12px] font-bold text-[#616161] pt-1">
+                      <div className="w-14 text-xs font-bold text-[var(--text-secondary)] pt-1">
                         {timeLabel}
                       </div>
 
                       <div className="flex-1 min-h-[44px]">
                         {dayEvents.length === 0 ? (
-                          <span className="text-[12px] text-[#C8C6C4] font-medium italic">
+                          <span className="text-xs text-[var(--text-secondary)]/60 font-medium italic">
                             Click to schedule a meeting
                           </span>
                         ) : (
@@ -695,22 +702,21 @@ export default function CalendarPage() {
                                 e.stopPropagation();
                                 setSelectedEvent(ev);
                               }}
-                              className="p-3 bg-[#5B5FC7]/10 border-l-4 border-[#5B5FC7] rounded-r-xl flex items-center justify-between"
+                              className="p-3 bg-indigo-500/10 border-l-4 border-indigo-500 rounded-r-xl flex items-center justify-between"
                             >
                               <div>
-                                <h4 className="text-[13px] font-bold text-[#242424]">{ev.title}</h4>
-                                <span className="text-[11px] text-[#616161]">{ev.location || 'Online'}</span>
+                                <h4 className="text-xs font-bold text-[var(--text-primary)]">{ev.title}</h4>
+                                <span className="text-[10px] text-[var(--text-secondary)]">{ev.location || 'Online HD Meeting'}</span>
                               </div>
-                              <Button
-                                appearance="primary"
-                                size="small"
+                              <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   router.push(`/meetings/room/${ev.meetingId || ev.id}`);
                                 }}
+                                className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
                               >
                                 Join
-                              </Button>
+                              </button>
                             </div>
                           ))
                         )}
@@ -723,20 +729,19 @@ export default function CalendarPage() {
           ) : (
             /* ──────────────── AGENDA VIEW ──────────────── */
             <div className="p-8 max-w-3xl mx-auto space-y-4">
-              <h3 className="text-[17px] font-bold text-[#242424] pb-2 border-b border-[#EDEBE9]">
+              <h3 className="text-sm font-bold text-[var(--text-primary)] pb-2 border-b border-[var(--border-subtle)]">
                 Upcoming Meetings ({events.length})
               </h3>
               {events.length === 0 ? (
-                <div className="py-16 text-center text-[#616161]">
-                  <PeopleRegular fontSize={32} className="mx-auto text-[#5B5FC7] mb-2" />
-                  <p className="text-[14px] font-medium">No upcoming meetings scheduled.</p>
-                  <Button
-                    appearance="primary"
-                    style={{ marginTop: '12px' }}
+                <div className="py-16 text-center text-[var(--text-secondary)]">
+                  <CalendarDays size={32} className="mx-auto text-indigo-400 mb-2" strokeWidth={1.65} />
+                  <p className="text-xs font-medium">No upcoming meetings scheduled.</p>
+                  <button
                     onClick={() => setIsCreateModalOpen(true)}
+                    className="mt-3 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
                   >
-                    Schedule meeting
-                  </Button>
+                    Schedule Meeting
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -744,24 +749,24 @@ export default function CalendarPage() {
                     <div
                       key={ev.id}
                       onClick={() => setSelectedEvent(ev)}
-                      className="p-4 rounded-xl border border-[#EDEBE9] hover:shadow-md transition-all flex items-center justify-between cursor-pointer bg-white"
+                      className="p-4 rounded-2xl border border-[var(--border-subtle)] hover:shadow-md transition-all flex items-center justify-between cursor-pointer bg-[var(--bg-surface)]"
                     >
                       <div className="space-y-1">
-                        <h4 className="text-[14px] font-bold text-[#242424]">{ev.title}</h4>
-                        <div className="text-[12px] text-[#616161] flex items-center gap-2">
-                          <ClockRegular fontSize={14} />
+                        <h4 className="text-xs font-bold text-[var(--text-primary)]">{ev.title}</h4>
+                        <div className="text-[11px] text-[var(--text-secondary)] flex items-center gap-2">
+                          <Clock size={12} strokeWidth={1.65} />
                           <span>{new Date(ev.startAt).toLocaleString()}</span>
                         </div>
                       </div>
-                      <Button
-                        appearance="primary"
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/meetings/room/${ev.meetingId || ev.id}`);
                         }}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
                       >
                         Join
-                      </Button>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -770,250 +775,262 @@ export default function CalendarPage() {
           )}
         </div>
 
-        {/* ── OFFICIAL FLUENT UI DIALOGS ── */}
+        {/* ── MODALS ── */}
 
-        {/* 1. New Meeting Dialog */}
-        <Dialog open={isCreateModalOpen} onOpenChange={(_, d) => setIsCreateModalOpen(d.open)}>
-          <DialogSurface>
-            <form onSubmit={handleCreateEvent}>
-              <DialogBody>
-                <DialogTitle
-                  action={
-                    <Button
-                      appearance="subtle"
-                      icon={<DismissRegular />}
-                      onClick={() => setIsCreateModalOpen(false)}
-                      aria-label="Close"
-                    />
-                  }
-                >
-                  <div className="flex items-center gap-2">
-                    <AddRegular fontSize={20} className="text-[#5B5FC7]" />
-                    <span>New meeting</span>
-                  </div>
-                </DialogTitle>
-
-                <DialogContent className="space-y-4 py-2">
-                  {createError && (
-                    <div className="p-3 bg-[#FDE7E9] text-[#C4314B] rounded-lg text-[12.5px] font-semibold">
-                      {createError}
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-[12px] font-semibold text-[#242424] mb-1">
-                      Title <span className="text-[#C4314B]">*</span>
-                    </label>
-                    <Input
-                      value={title}
-                      onChange={(_, d) => setTitle(d.value)}
-                      placeholder="Add meeting title"
-                      style={{ width: '100%' }}
-                      required
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">Start date</label>
-                      <Input
-                        type="date"
-                        value={startDateStr}
-                        onChange={(_, d) => setStartDateStr(d.value)}
-                        style={{ width: '100%' }}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">Start time</label>
-                      <Input
-                        type="time"
-                        value={startTimeStr}
-                        onChange={(_, d) => setStartTimeStr(d.value)}
-                        style={{ width: '100%' }}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">End date</label>
-                      <Input
-                        type="date"
-                        value={endDateStr}
-                        onChange={(_, d) => setEndDateStr(d.value)}
-                        style={{ width: '100%' }}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[12px] font-semibold text-[#616161] mb-1">End time</label>
-                      <Input
-                        type="time"
-                        value={endTimeStr}
-                        onChange={(_, d) => setEndTimeStr(d.value)}
-                        style={{ width: '100%' }}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-[#FAF9F8] rounded-xl border border-[#EDEBE9] flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <VideoRegular fontSize={18} className="text-[#5B5FC7]" />
-                      <div>
-                        <div className="text-[13px] font-bold text-[#242424]">Teams meeting</div>
-                        <div className="text-[11px] text-[#616161]">Online audio/video conference link</div>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isOnlineMeeting}
-                      onChange={(e) => setIsOnlineMeeting(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#5B5FC7]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[12px] font-semibold text-[#616161] mb-1">Description</label>
-                    <textarea
-                      rows={3}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Type details for this new meeting..."
-                      className="w-full px-3 py-2 border border-[#D1D1D1] rounded-lg text-[12.5px] outline-none focus:border-[#5B5FC7] resize-none"
-                    />
-                  </div>
-                </DialogContent>
-
-                <DialogActions>
-                  <Button appearance="secondary" onClick={() => setIsCreateModalOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button appearance="primary" type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Saving...' : 'Save'}
-                  </Button>
-                </DialogActions>
-              </DialogBody>
-            </form>
-          </DialogSurface>
-        </Dialog>
-
-        {/* 2. Meet Now Dialog */}
-        <Dialog open={isMeetNowModalOpen} onOpenChange={(_, d) => setIsMeetNowModalOpen(d.open)}>
-          <DialogSurface>
-            <DialogBody>
-              <DialogTitle
-                action={
-                  <Button
-                    appearance="subtle"
-                    icon={<DismissRegular />}
-                    onClick={() => setIsMeetNowModalOpen(false)}
-                    aria-label="Close"
-                  />
-                }
-              >
+        {/* 1. New Meeting Modal */}
+        {isCreateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl p-6">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                 <div className="flex items-center gap-2">
-                  <VideoRegular fontSize={20} className="text-[#5B5FC7]" />
-                  <span>Start instant meeting</span>
+                  <CalendarDays size={18} className="text-indigo-400" strokeWidth={1.65} />
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Schedule Meeting</h3>
                 </div>
-              </DialogTitle>
-
-              <DialogContent className="py-3 text-[13px] text-[#616161] leading-relaxed">
-                You will be connected to a private meeting room where you can invite others by sharing your link.
-              </DialogContent>
-
-              <DialogActions>
-                <Button appearance="secondary" onClick={() => setIsMeetNowModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button appearance="primary" onClick={handleInstantMeetNow}>
-                  Start meeting
-                </Button>
-              </DialogActions>
-            </DialogBody>
-          </DialogSurface>
-        </Dialog>
-
-        {/* 3. Event Details Dialog */}
-        <Dialog open={!!selectedEvent} onOpenChange={(_, d) => { if (!d.open) setSelectedEvent(null); }}>
-          <DialogSurface>
-            {selectedEvent && (
-              <DialogBody>
-                <DialogTitle
-                  action={
-                    <Button
-                      appearance="subtle"
-                      icon={<DismissRegular />}
-                      onClick={() => setSelectedEvent(null)}
-                      aria-label="Close"
-                    />
-                  }
+                <button
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#5B5FC7]" />
-                    <span>{selectedEvent.title}</span>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateEvent} className="mt-4 space-y-3.5">
+                {createError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold">
+                    {createError}
                   </div>
-                </DialogTitle>
+                )}
 
-                <DialogContent className="space-y-4 py-2 text-[13px]">
-                  <div className="flex items-center gap-2.5 text-[#616161]">
-                    <ClockRegular fontSize={16} />
-                    <span>
-                      {new Date(selectedEvent.startAt).toLocaleString('default', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}{' '}
-                      –{' '}
-                      {new Date(selectedEvent.endAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-primary)] mb-1">
+                    Meeting Title <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. Design Review, Sprint Planning"
+                    className="w-full px-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-indigo-500"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Start date</label>
+                    <input
+                      type="date"
+                      value={startDateStr}
+                      onChange={(e) => setStartDateStr(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)]"
+                      required
+                    />
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Start time</label>
+                    <input
+                      type="time"
+                      value={startTimeStr}
+                      onChange={(e) => setStartTimeStr(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)]"
+                      required
+                    />
+                  </div>
+                </div>
 
-                  {selectedEvent.location && (
-                    <div className="flex items-center gap-2.5 text-[#616161]">
-                      <LocationRegular fontSize={16} />
-                      <span>{selectedEvent.location}</span>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">End date</label>
+                    <input
+                      type="date"
+                      value={endDateStr}
+                      onChange={(e) => setEndDateStr(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">End time</label>
+                    <input
+                      type="time"
+                      value={endTimeStr}
+                      onChange={(e) => setEndTimeStr(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)]"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[var(--bg-canvas)] rounded-xl border border-[var(--border-subtle)] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Video size={16} className="text-indigo-400" />
+                    <div>
+                      <div className="text-xs font-bold text-[var(--text-primary)]">TeamTrack HD Meeting</div>
+                      <div className="text-[10px] text-[var(--text-secondary)]">Includes 4K video, screen sharing &amp; chat</div>
                     </div>
-                  )}
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isOnlineMeeting}
+                    onChange={(e) => setIsOnlineMeeting(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                </div>
 
-                  {selectedEvent.description && (
-                    <div className="p-3 bg-[#FAF9F8] rounded-xl border border-[#EDEBE9] text-[#242424] leading-relaxed">
-                      {selectedEvent.description}
-                    </div>
-                  )}
-                </DialogContent>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Description</label>
+                  <textarea
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Add an agenda or notes..."
+                    className="w-full px-3 py-2 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] rounded-xl text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] outline-none focus:border-indigo-500 resize-none"
+                  />
+                </div>
 
-                <DialogActions>
-                  <Button
-                    appearance="subtle"
-                    icon={<DeleteRegular fontSize={16} />}
-                    onClick={() => handleDeleteEvent(selectedEvent.id)}
-                    style={{ color: '#C4314B', marginRight: 'auto' }}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="px-3.5 py-1.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs text-[var(--text-secondary)] cursor-pointer"
                   >
-                    Cancel meeting
-                  </Button>
-                  <Button appearance="secondary" onClick={() => setSelectedEvent(null)}>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmitting ? 'Scheduling...' : 'Schedule'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 2. Meet Now Modal */}
+        {isMeetNowModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl p-6">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2">
+                  <Video size={18} className="text-indigo-400" />
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Instant HD Meeting</h3>
+                </div>
+                <button
+                  onClick={() => setIsMeetNowModalOpen(false)}
+                  className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="py-4 text-xs text-[var(--text-secondary)] leading-relaxed space-y-2">
+                <p>
+                  Start an instant encrypted room with unlimited participants, HD audio/video, and screen sharing at no cost.
+                </p>
+                <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-medium text-[11px] flex items-center gap-2">
+                  <Sparkles size={14} />
+                  <span>Free Pro conference tier unlocked</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
+                <button
+                  onClick={() => setIsMeetNowModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs text-[var(--text-secondary)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleInstantMeetNow}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-md shadow-indigo-600/20"
+                >
+                  Start Meeting
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Event Details Modal */}
+        {selectedEvent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl p-6">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-indigo-500" />
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">{selectedEvent.title}</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-3 py-4 text-xs">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Clock size={14} className="text-indigo-400" />
+                  <span>
+                    {new Date(selectedEvent.startAt).toLocaleString('default', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}{' '}
+                    –{' '}
+                    {new Date(selectedEvent.endAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+
+                {selectedEvent.location && (
+                  <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                    <MapPin size={14} className="text-indigo-400" />
+                    <span>{selectedEvent.location}</span>
+                  </div>
+                )}
+
+                {selectedEvent.description && (
+                  <div className="p-3 bg-[var(--bg-canvas)] rounded-xl border border-[var(--border-subtle)] text-[var(--text-primary)] leading-relaxed">
+                    {selectedEvent.description}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
+                <button
+                  onClick={() => handleDeleteEvent(selectedEvent.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-rose-400 hover:bg-rose-500/10 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Trash2 size={14} />
+                  <span>Cancel Meeting</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedEvent(null)}
+                    className="px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs text-[var(--text-secondary)] cursor-pointer"
+                  >
                     Close
-                  </Button>
-                  <Button
-                    appearance="primary"
+                  </button>
+                  <button
                     onClick={() => router.push(`/meetings/room/${selectedEvent.meetingId || selectedEvent.id}`)}
+                    className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-md shadow-indigo-600/20"
                   >
                     Join
-                  </Button>
-                </DialogActions>
-              </DialogBody>
-            )}
-          </DialogSurface>
-        </Dialog>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </TeamsShell>
   );

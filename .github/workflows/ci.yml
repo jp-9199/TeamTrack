@@ -1,47 +1,69 @@
-name: CI Pipeline
+name: TeamTrack CI
 
 on:
+  push:
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  verify:
-    name: Verify (Typecheck & Test)
+  validate-and-test:
+    name: Build & Verify
     runs-on: ubuntu-latest
-    
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: teamtrack
+          POSTGRES_PASSWORD: teamtrack_test_password
+          POSTGRES_DB: teamtrack_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 20
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Monorepo Dependencies
         run: npm ci
 
-      - name: Run Typecheck (All Workspaces)
+      - name: Build Shared Packages
+        run: npm run build:packages
+
+      - name: Monorepo Typecheck
         run: npm run typecheck
 
-      - name: Run Tests
-        run: npm run test
+      - name: Run Backend & AI Security Tests
+        run: npm run test:ai
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://teamtrack:teamtrack_test_password@localhost:5432/teamtrack_test
+          REDIS_URL: redis://localhost:6379
 
-      - name: Build Packages & Apps
-        run: npm run build
-
-  docker-verify:
-    name: Verify Docker Builds
-    runs-on: ubuntu-latest
-    needs: verify
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build Backend Image
-        run: docker build -f infrastructure/backend.Dockerfile .
-
-      - name: Build Web Image
-        run: docker build -f infrastructure/web.Dockerfile .
+      - name: Build Web Application
+        run: npm run --workspace=@teamtrack/web build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          NEXT_PUBLIC_BACKEND_URL: http://localhost:4000

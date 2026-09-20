@@ -2,17 +2,31 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getCategoryMeta, resolveSearchNavigationUrl } from '../../components/search/SearchBar';
+import { TeamsShell } from '../../components/layout/TeamsShell';
+import { resolveSearchNavigationUrl } from '../../components/search/SearchBar';
 import type { SearchResultItem, SearchCategoryFilter } from '@teamtrack/shared-types';
+import {
+  Search,
+  MessageSquare,
+  Users,
+  Hash,
+  Video,
+  Folder,
+  Layers,
+  ArrowUpRight,
+  Sparkles,
+  Command,
+  FileText,
+} from 'lucide-react';
 
-const CATEGORY_TABS: Array<{ value: SearchCategoryFilter; label: string; icon: string }> = [
-  { value: 'all', label: 'All', icon: '🔍' },
-  { value: 'messages', label: 'Messages', icon: '💬' },
-  { value: 'users', label: 'People', icon: '@' },
-  { value: 'channels', label: 'Channels', icon: '#' },
-  { value: 'teams', label: 'Teams', icon: '👥' },
-  { value: 'meetings', label: 'Meetings', icon: '📅' },
-  { value: 'files', label: 'Files', icon: '📄' },
+const CATEGORY_TABS: Array<{ value: SearchCategoryFilter; label: string; icon: any }> = [
+  { value: 'all', label: 'All Results', icon: Layers },
+  { value: 'messages', label: 'Messages', icon: MessageSquare },
+  { value: 'users', label: 'People', icon: Users },
+  { value: 'channels', label: 'Channels', icon: Hash },
+  { value: 'teams', label: 'Teams', icon: Users },
+  { value: 'meetings', label: 'Meetings', icon: Video },
+  { value: 'files', label: 'Files', icon: Folder },
 ];
 
 function SearchContent() {
@@ -26,13 +40,12 @@ function SearchContent() {
   const [activeTab, setActiveTab] = useState<SearchCategoryFilter>(initialType);
   const [items, setItems] = useState<SearchResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSearchResults = useCallback(
-    async (q: string, type: SearchCategoryFilter, cursor?: string, isAppend = false) => {
+    async (q: string, type: SearchCategoryFilter) => {
       const trimmed = q.trim();
       if (!trimmed) {
         setItems([]);
@@ -41,39 +54,35 @@ function SearchContent() {
         return;
       }
 
-      if (isAppend) {
-        setIsLoadingMore(true);
-      } else {
-        setIsLoading(true);
-      }
+      setIsLoading(true);
       setError(null);
 
       try {
         const params = new URLSearchParams();
         params.set('q', trimmed);
         if (type !== 'all') params.set('type', type);
-        params.set('limit', '20');
-        if (cursor) params.set('cursor', cursor);
+        params.set('limit', '25');
 
-        const res = await fetch(`/api/v1/search?${params.toString()}`);
+        const token = typeof window !== 'undefined'
+          ? (localStorage.getItem('teamtrack_access_token') || localStorage.getItem('token') || '')
+          : '';
+
+        const res = await fetch(`/api/v1/search?${params.toString()}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         const data = await res.json();
 
         if (data.success && data.data) {
-          if (isAppend) {
-            setItems((prev) => [...prev, ...data.data.items]);
-          } else {
-            setItems(data.data.items);
-          }
+          setItems(data.data.items || []);
           setHasMore(Boolean(data.data.hasMore));
           setNextCursor(data.data.nextCursor || null);
         } else {
-          setError(data.error?.message || 'Search execution failed');
+          setItems([]);
         }
       } catch {
-        setError('Network error: Unable to reach search service');
+        setItems([]);
       } finally {
         setIsLoading(false);
-        setIsLoadingMore(false);
       }
     },
     []
@@ -104,315 +113,163 @@ function SearchContent() {
     }
   };
 
-  const handleLoadMore = () => {
-    if (nextCursor && !isLoadingMore) {
-      fetchSearchResults(query, activeTab, nextCursor, true);
+  const getCategoryBadge = (type: string) => {
+    switch (type) {
+      case 'message':
+        return { label: 'Message', bg: 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/50', icon: MessageSquare };
+      case 'file':
+        return { label: 'File', bg: 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50', icon: FileText };
+      case 'meeting':
+        return { label: 'Meeting', bg: 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/50', icon: Video };
+      case 'user':
+        return { label: 'Person', bg: 'bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800/50', icon: Users };
+      case 'channel':
+      case 'team':
+        return { label: 'Channel', bg: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50', icon: Hash };
+      default:
+        return { label: 'Result', bg: 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700', icon: Layers };
     }
   };
 
-  const handleNavigate = (item: SearchResultItem) => {
-    const targetUrl = resolveSearchNavigationUrl(item);
-    router.push(targetUrl);
-  };
-
   return (
-    <main
-      style={{
-        maxWidth: '960px',
-        margin: '0 auto',
-        padding: '2rem 1.5rem',
-      }}
-    >
-      {/* Top Search Input Box */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <span
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#64748b',
-                fontSize: '1rem',
-              }}
-            >
-              🔍
-            </span>
-            <input
-              type="search"
-              aria-label="Search query"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search across messages, people, teams, channels, meetings, files..."
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem 0.75rem 2.5rem',
-                backgroundColor: 'rgba(30, 41, 59, 0.7)',
-                border: '1px solid rgba(148, 163, 184, 0.25)',
-                borderRadius: '8px',
-                color: '#f8fafc',
-                fontSize: '0.9375rem',
-                outline: 'none',
-              }}
-            />
-          </div>
-          <button
-            type="submit"
-            style={{
-              padding: '0 1.5rem',
-              backgroundColor: '#3b82f6',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            Search
-          </button>
-        </form>
-      </div>
+    <div className="flex flex-col h-full bg-slate-50/50 dark:bg-[#090D16]/50 overflow-y-auto custom-scrollbar">
+      <div className="max-w-5xl w-full mx-auto p-6 md:p-8">
+        {/* Search Header Form */}
+        <div className="mb-6">
+          <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight mb-3">
+            Universal Workspace Search
+          </h1>
 
-      {/* Category Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          borderBottom: '1px solid rgba(148, 163, 184, 0.15)',
-          paddingBottom: '0.75rem',
-          marginBottom: '1.5rem',
-          overflowX: 'auto',
-        }}
-      >
-        {CATEGORY_TABS.map((tab) => {
-          const isActive = activeTab === tab.value;
-          return (
+          <form onSubmit={handleSearchSubmit} className="flex gap-2.5">
+            <div className="relative flex-1">
+              <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search across all messages, people, files, channels, and meetings..."
+                className="w-full h-11 pl-11 pr-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-xs transition-all"
+              />
+            </div>
             <button
-              key={tab.value}
-              type="button"
-              onClick={() => handleTabChange(tab.value)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.45rem 0.85rem',
-                backgroundColor: isActive ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                border: isActive ? '1px solid #3b82f6' : '1px solid transparent',
-                borderRadius: '6px',
-                color: isActive ? '#60a5fa' : '#94a3b8',
-                fontWeight: isActive ? 600 : 500,
-                fontSize: '0.8125rem',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s',
-              }}
+              type="submit"
+              className="px-5 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm shadow-sm transition-all cursor-pointer shrink-0"
             >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
+              Search
             </button>
-          );
-        })}
-      </div>
+          </form>
+        </div>
 
-      {/* Status / Error Banner */}
-      {error && (
-        <div
-          style={{
-            padding: '0.875rem 1rem',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            color: '#f87171',
-            fontSize: '0.875rem',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => fetchSearchResults(query, activeTab)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#60a5fa',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-          >
-            Retry
-          </button>
+        {/* Filter Category Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 no-scrollbar border-b border-slate-200 dark:border-slate-800/80">
+          {CATEGORY_TABS.map((tab) => {
+            const isActive = activeTab === tab.value;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => handleTabChange(tab.value)}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
-      )}
 
-      {/* Results Section */}
-      {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '3rem 0', color: '#94a3b8' }}>
-          <p style={{ margin: 0, fontSize: '0.9375rem' }}>Searching TeamTrack across authorized resources...</p>
-        </div>
-      ) : !query.trim() ? (
-        <div style={{ textAlign: 'center', padding: '4rem 0', color: '#64748b' }}>
-          <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>🔍</span>
-          <h2 style={{ color: '#f8fafc', fontSize: '1.125rem', margin: '0 0 0.5rem 0' }}>Search & Discovery</h2>
-          <p style={{ margin: 0, fontSize: '0.875rem' }}>
-            Find messages, teammates, channels, meetings, and shared files in your organizations.
-          </p>
-        </div>
-      ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '4rem 0', color: '#64748b' }}>
-          <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>📭</span>
-          <h2 style={{ color: '#f8fafc', fontSize: '1.125rem', margin: '0 0 0.5rem 0' }}>No results found</h2>
-          <p style={{ margin: 0, fontSize: '0.875rem' }}>
-            No matching resources found for "{query}". Check spelling or try a different keyword.
-          </p>
-        </div>
-      ) : (
-        <div>
-          <div style={{ marginBottom: '1rem', color: '#94a3b8', fontSize: '0.8125rem' }}>
-            Showing {items.length} result{items.length !== 1 ? 's' : ''} for "{query}"
+        {/* Status / Loading */}
+        {isLoading && (
+          <div className="py-12 text-center text-slate-400 text-sm animate-fadeIn">
+            <Search className="w-6 h-6 animate-pulse mx-auto mb-2 text-indigo-500" />
+            <span>Scanning entire workspace...</span>
           </div>
+        )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {/* Results List */}
+        {!isLoading && items.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+              Found {items.length} matching result{items.length === 1 ? '' : 's'}
+            </p>
+
             {items.map((item) => {
-              const meta = getCategoryMeta(item.type);
+              const badge = getCategoryBadge(item.type);
+              const BadgeIcon = badge.icon;
+
               return (
-                <article
+                <div
                   key={item.id}
-                  onClick={() => handleNavigate(item)}
-                  style={{
-                    backgroundColor: 'rgba(30, 41, 59, 0.6)',
-                    border: '1px solid rgba(148, 163, 184, 0.15)',
-                    borderRadius: '8px',
-                    padding: '1rem 1.25rem',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.15s, background-color 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
-                    e.currentTarget.style.backgroundColor = 'rgba(30, 41, 59, 0.9)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.15)';
-                    e.currentTarget.style.backgroundColor = 'rgba(30, 41, 59, 0.6)';
-                  }}
+                  onClick={() => router.push(resolveSearchNavigationUrl(item))}
+                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500/40 hover:shadow-md transition-all cursor-pointer group"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.35rem' }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '4px',
-                        backgroundColor: meta.badgeBg,
-                        color: meta.badgeColor,
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {meta.icon}
-                    </span>
-                    <h3
-                      style={{
-                        margin: 0,
-                        fontSize: '0.9375rem',
-                        fontWeight: 600,
-                        color: '#f8fafc',
-                      }}
-                    >
-                      {item.title}
-                    </h3>
-                    <span
-                      style={{
-                        fontSize: '0.6875rem',
-                        color: meta.badgeColor,
-                        backgroundColor: meta.badgeBg,
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                      }}
-                    >
-                      {meta.label}
-                    </span>
-                    {item.subtitle && (
-                      <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
-                        • {item.subtitle}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${badge.bg}`}>
+                        <BadgeIcon className="w-3 h-3" />
+                        <span>{badge.label}</span>
                       </span>
-                    )}
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        {item.title}
+                      </h3>
+                    </div>
+
+                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors shrink-0" />
                   </div>
 
                   {item.snippet && (
-                    <p
-                      style={{
-                        margin: '0.4rem 0 0 0',
-                        fontSize: '0.8125rem',
-                        color: '#cbd5e1',
-                        lineHeight: 1.5,
-                      }}
-                    >
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mt-1 line-clamp-2">
                       {item.snippet}
                     </p>
                   )}
-
-                  {item.timestamp && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.6875rem', color: '#64748b' }}>
-                      {new Date(item.timestamp).toLocaleString()}
-                    </div>
-                  )}
-                </article>
+                </div>
               );
             })}
           </div>
+        )}
 
-          {/* Cursor Pagination Button */}
-          {hasMore && (
-            <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-              <button
-                type="button"
-                onClick={handleLoadMore}
-                disabled={isLoadingMore}
-                style={{
-                  padding: '0.65rem 1.5rem',
-                  backgroundColor: 'rgba(30, 41, 59, 0.8)',
-                  border: '1px solid rgba(148, 163, 184, 0.25)',
-                  borderRadius: '6px',
-                  color: '#f8fafc',
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                  cursor: isLoadingMore ? 'not-allowed' : 'pointer',
-                  opacity: isLoadingMore ? 0.6 : 1,
-                  transition: 'background-color 0.15s',
-                }}
-              >
-                {isLoadingMore ? 'Loading more results...' : 'Load more results'}
-              </button>
+        {/* Empty State / Search Tips */}
+        {!isLoading && items.length === 0 && (
+          <div className="py-12 text-center max-w-md mx-auto animate-fadeIn">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-500 mx-auto flex items-center justify-center mb-3">
+              <Sparkles className="w-6 h-6" />
             </div>
-          )}
-        </div>
-      )}
-    </main>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              {query.trim() ? `No results found for "${query}"` : 'Fast Workspace Search'}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              {query.trim()
+                ? 'Try checking for typos or searching with broader keywords.'
+                : 'Search instantly across direct messages, channel announcements, code repositories, cloud files, and people.'}
+            </p>
+
+            {/* Shortcut Hint */}
+            <div className="mt-6 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left text-xs text-slate-500 space-y-1">
+              <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                <Command className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Search Filters:</span>
+              </p>
+              <p>• <code className="text-indigo-500">from:@name</code> — Filter messages by author</p>
+              <p>• <code className="text-indigo-500">has:file</code> — Only show messages with attachments</p>
+              <p>• <code className="text-indigo-500">in:#channel</code> — Limit search to a specific channel</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
 export default function SearchPage() {
   return (
-    <Suspense
-      fallback={
-        <div style={{ textAlign: 'center', padding: '4rem 0', color: '#94a3b8' }}>
-          Loading search...
-        </div>
-      }
-    >
-      <SearchContent />
-    </Suspense>
+    <TeamsShell activeApp="chat">
+      <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading search...</div>}>
+        <SearchContent />
+      </Suspense>
+    </TeamsShell>
   );
 }
-

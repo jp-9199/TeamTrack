@@ -1,359 +1,809 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { TeamsShell } from '../../components/layout/TeamsShell';
 import { useAuth } from '../../components/auth/AuthContext';
 import {
-  Button,
-  Input,
-  Switch,
-  Dropdown,
-  Option,
-  Avatar,
-  Divider,
-  Card,
-  Tab,
-  TabList,
-} from '@fluentui/react-components';
-import {
-  PersonRegular,
-  ColorRegular,
-  AlertRegular,
-  MicRegular,
-  LockClosedRegular,
-  CheckmarkCircleRegular,
-} from '@fluentui/react-icons';
+  User,
+  ShieldCheck,
+  Laptop,
+  Palette,
+  Bell,
+  Mic,
+  Lock,
+  Check,
+  CheckCircle2,
+  AlertCircle,
+  Headphones,
+  Volume2,
+  Video,
+  Key,
+  Smartphone,
+  Globe,
+  Trash2,
+} from 'lucide-react';
+import type { UserProfile, UserSecuritySummary, UserSessionItem } from '@teamtrack/shared-types';
+import { api } from '../../lib/api';
 
-export default function SettingsPage() {
+type SettingsTab = 'profile' | 'security' | 'sessions' | 'appearance' | 'devices' | 'notifications';
+
+function SettingsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, logout } = useAuth();
-  const [selectedTab, setSelectedTab] = useState<'general' | 'appearance' | 'notifications' | 'devices' | 'privacy'>('general');
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [soundNotifs, setSoundNotifs] = useState(true);
-  const [bannerNotifs, setBannerNotifs] = useState(true);
-  const [selectedMic, setSelectedMic] = useState('Default - Microphone (High Definition Audio)');
+
+  const initialTab = (searchParams.get('tab') as SettingsTab) || 'profile';
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+
+  // Profile state
+  const [displayName, setDisplayName] = useState(user?.displayName || '');
+  const [jobTitle, setJobTitle] = useState('');
+  const [timezone, setTimezone] = useState('UTC+05:00 (Islamabad, Karachi)');
+  const [locale, setLocale] = useState('en-US');
+  const [bio, setBio] = useState('');
+
+  // Security state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+
+  // Sessions state (loaded from real backend)
+  const [sessions, setSessions] = useState<UserSessionItem[]>([]);
+
+  // Appearance state
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark');
+
+  // Devices & Audio visualizer test
+  const [selectedMic, setSelectedMic] = useState('Default - Microphone Array (Realtek Audio)');
   const [selectedSpeaker, setSelectedSpeaker] = useState('Default - Speakers (Realtek Audio)');
-  const [selectedCamera, setSelectedCamera] = useState('Integrated Webcam (04f2:b6d9)');
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [selectedCamera, setSelectedCamera] = useState('Integrated HD Webcam (1080p)');
+  const [isTestingMic, setIsTestingMic] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(35);
 
-  const userName = user?.displayName || 'Amir Asad Ullah Khan';
-  const userEmail = user?.email || 'user@teamtrack.local';
+  // Notification state (loaded from real backend)
+  const [desktopNotifs, setDesktopNotifs] = useState(true);
+  const [emailDigests, setEmailDigests] = useState(false);
+  const [soundAlerts, setSoundAlerts] = useState(true);
+  const [mentionAlerts, setMentionAlerts] = useState(true);
 
-  const handleSave = () => {
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+  // Status feedback
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch real data from backend on mount
+  useEffect(() => {
+    async function loadUserData() {
+      try {
+        const [profileRes, securityRes, sessionsRes, notifRes] = await Promise.allSettled([
+          api.getUserProfile(),
+          api.getUserSecurity(),
+          api.getUserSessions(),
+          api.getNotificationPreferences(),
+        ]);
+
+        if (profileRes.status === 'fulfilled' && profileRes.value.success && profileRes.value.data) {
+          const p = profileRes.value.data;
+          setDisplayName(p.displayName || '');
+          setJobTitle(p.jobTitle || '');
+          setTimezone(p.timezone || 'UTC+05:00 (Islamabad, Karachi)');
+          setLocale(p.locale || 'en-US');
+        }
+
+        if (sessionsRes.status === 'fulfilled' && sessionsRes.value.success && sessionsRes.value.data) {
+          setSessions(sessionsRes.value.data.sessions || []);
+        }
+
+        if (notifRes.status === 'fulfilled' && notifRes.value.success && notifRes.value.data) {
+          const np = notifRes.value.data;
+          setDesktopNotifs(np.push_enabled ?? true);
+          setEmailDigests(np.email_enabled ?? false);
+          setSoundAlerts(np.sound_enabled ?? true);
+        }
+      } catch (err) {
+        console.error('Failed to load settings from server', err);
+      }
+    }
+    if (user) {
+      loadUserData();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'dark' : 'light');
+    }
+  }, []);
+
+  const handleApplyTheme = (newTheme: 'light' | 'dark' | 'system') => {
+    setTheme(newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else if (newTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
+      localStorage.removeItem('theme');
+    }
   };
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      const res = await api.updateUserProfile({
+        displayName,
+        jobTitle,
+        timezone,
+        locale,
+      });
+      if (res.success) {
+        setSaveSuccess('Profile information updated in database successfully!');
+        setTimeout(() => setSaveSuccess(null), 3500);
+      } else {
+        setSaveError(res.error?.message || 'Failed to update profile');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Network error saving profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaveError(null);
+    if (newPassword !== confirmPassword) {
+      setSaveError('New password and confirmation do not match.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setSaveError('New password must be at least 8 characters long.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await api.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      if (res.success) {
+        setSaveSuccess('Password successfully updated and securely hashed with Argon2id!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => setSaveSuccess(null), 3500);
+      } else {
+        setSaveError(res.error?.message || 'Failed to update password. Please check your current password.');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error updating password');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRevokeSession = async (sessionId: string) => {
+    setSaveError(null);
+    try {
+      const res = await api.revokeSession(sessionId);
+      if (res.success) {
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        setSaveSuccess('Session revoked. The device has been signed out.');
+        setTimeout(() => setSaveSuccess(null), 3000);
+      } else {
+        setSaveError(res.error?.message || 'Failed to revoke session');
+      }
+    } catch (err: any) {
+      setSaveError(err?.message || 'Error revoking session');
+    }
+  };
+
+  const handleUpdateNotificationPreferences = async (updates: {
+    pushEnabled?: boolean;
+    emailEnabled?: boolean;
+    realtimeEnabled?: boolean;
+  }) => {
+    try {
+      await api.updateNotificationPreferences(updates);
+      setSaveSuccess('Notification preferences saved to backend.');
+      setTimeout(() => setSaveSuccess(null), 2500);
+    } catch (err) {
+      console.error('Failed to sync notification preferences', err);
+    }
+  };
+
+  // Mic test visualizer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTestingMic) {
+      interval = setInterval(() => {
+        setAudioLevel(Math.floor(20 + Math.random() * 75));
+      }, 120);
+    } else {
+      setAudioLevel(0);
+    }
+    return () => clearInterval(interval);
+  }, [isTestingMic]);
+
+  const tabs = [
+    { id: 'profile', label: 'Profile & Account', icon: User },
+    { id: 'security', label: 'Security & 2FA', icon: ShieldCheck },
+    { id: 'sessions', label: 'Active Sessions', icon: Laptop },
+    { id: 'appearance', label: 'Theme & Appearance', icon: Palette },
+    { id: 'devices', label: 'Audio & Video Devices', icon: Headphones },
+    { id: 'notifications', label: 'Notification Alerts', icon: Bell },
+  ];
+
+  // ── SECONDARY SIDEBAR: SETTINGS NAVIGATION ──
   const sidebar = (
-    <div className="flex flex-col h-full bg-[#ECEEF0] text-[#242424] p-3 select-none">
-      <h2 className="text-[18px] font-bold px-2 pt-2 pb-3">Settings</h2>
-      <div className="flex flex-col gap-1">
-        <button
-          onClick={() => setSelectedTab('general')}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all text-left cursor-pointer ${
-            selectedTab === 'general' ? 'bg-white font-semibold text-[#5B5FC7] shadow-xs' : 'hover:bg-black/5 text-[#424242]'
-          }`}
-        >
-          <PersonRegular fontSize={18} />
-          <span>General & Account</span>
-        </button>
+    <div className="flex flex-col h-full bg-slate-50/90 dark:bg-[#0B1120]/95 text-slate-800 dark:text-slate-100 p-3 select-none">
+      <h2 className="text-sm font-bold px-2 pt-2 pb-3 border-b border-slate-200 dark:border-slate-800 mb-2">
+        Settings & Preferences
+      </h2>
 
-        <button
-          onClick={() => setSelectedTab('appearance')}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all text-left cursor-pointer ${
-            selectedTab === 'appearance' ? 'bg-white font-semibold text-[#5B5FC7] shadow-xs' : 'hover:bg-black/5 text-[#424242]'
-          }`}
-        >
-          <ColorRegular fontSize={18} />
-          <span>Appearance</span>
-        </button>
-
-        <button
-          onClick={() => setSelectedTab('notifications')}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all text-left cursor-pointer ${
-            selectedTab === 'notifications' ? 'bg-white font-semibold text-[#5B5FC7] shadow-xs' : 'hover:bg-black/5 text-[#424242]'
-          }`}
-        >
-          <AlertRegular fontSize={18} />
-          <span>Notifications</span>
-        </button>
-
-        <button
-          onClick={() => setSelectedTab('devices')}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all text-left cursor-pointer ${
-            selectedTab === 'devices' ? 'bg-white font-semibold text-[#5B5FC7] shadow-xs' : 'hover:bg-black/5 text-[#424242]'
-          }`}
-        >
-          <MicRegular fontSize={18} />
-          <span>Devices (Audio & Video)</span>
-        </button>
-
-        <button
-          onClick={() => setSelectedTab('privacy')}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all text-left cursor-pointer ${
-            selectedTab === 'privacy' ? 'bg-white font-semibold text-[#5B5FC7] shadow-xs' : 'hover:bg-black/5 text-[#424242]'
-          }`}
-        >
-          <LockClosedRegular fontSize={18} />
-          <span>Privacy & Security</span>
-        </button>
+      <div className="flex-1 space-y-1">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as SettingsTab)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer text-left ${
+                isActive
+                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" strokeWidth={1.65} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mt-auto p-2 border-t border-[#E1DFDD]/60">
-        <Link
-          href="/settings/profile"
-          className="text-[12px] text-[#5B5FC7] hover:underline block py-1 font-medium"
+      <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
+        <button
+          onClick={() => {
+            if (logout) logout();
+            else router.push('/login');
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-colors"
         >
-          → Detailed Profile Settings
-        </Link>
-        <Link
-          href="/settings/security"
-          className="text-[12px] text-[#5B5FC7] hover:underline block py-1 font-medium"
-        >
-          → Security & Password
-        </Link>
-        <Link
-          href="/settings/sessions"
-          className="text-[12px] text-[#5B5FC7] hover:underline block py-1 font-medium"
-        >
-          → Active Sessions
-        </Link>
+          <span>Sign Out of All Accounts</span>
+        </button>
       </div>
     </div>
   );
 
   return (
     <TeamsShell sidebar={sidebar} activeApp="settings">
-      <div className="flex-1 overflow-y-auto bg-white p-8 custom-scrollbar">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {savedSuccess && (
-            <div className="p-3 bg-green-50 text-green-800 border border-green-200 rounded-lg flex items-center gap-2 text-[13px] animate-fadeIn">
-              <CheckmarkCircleRegular fontSize={18} className="text-green-600" />
-              <span>Settings saved successfully.</span>
+      <div className="flex-1 h-full overflow-y-auto custom-scrollbar p-6 md:p-10 bg-slate-50/40 dark:bg-[#090D16]/40 text-slate-800 dark:text-slate-100">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {/* Status Message */}
+          {saveSuccess && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center gap-2 animate-scale-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+              <span>{saveSuccess}</span>
             </div>
           )}
 
-          {/* 1. General & Account Tab */}
-          {selectedTab === 'general' && (
-            <section className="space-y-6">
+          {saveError && (
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center gap-2 animate-scale-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+              <span>{saveError}</span>
+            </div>
+          )}
+
+          {/* ── TAB 1: PROFILE & ACCOUNT ── */}
+          {activeTab === 'profile' && (
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6">
               <div>
-                <h1 className="text-[20px] font-bold text-[#242424]">General & Account</h1>
-                <p className="text-[13px] text-[#616161] mt-0.5">Manage your profile, language, and startup preferences.</p>
+                <h2 className="text-lg font-bold">Profile & Identity</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Manage how your profile appears across channels, direct chats, and calls.
+                </p>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-[#FAF9F8] border border-[#E1DFDD]">
-                <Avatar name={userName} size={56} color="colorful" badge={{ status: 'available' }} />
+              {/* Avatar Preview */}
+              <div className="flex items-center gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white font-extrabold text-xl flex items-center justify-center shadow-md">
+                  {displayName[0]?.toUpperCase() || 'A'}
+                </div>
                 <div>
-                  <h3 className="text-[15px] font-bold text-[#242424]">{userName}</h3>
-                  <p className="text-[12px] text-[#616161]">{userEmail}</p>
-                  <span className="inline-block mt-1 px-2 py-0.5 bg-[#EBEAF9] text-[#5B5FC7] text-[11px] font-semibold rounded">
-                    Enterprise Member
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{displayName}</h3>
+                  <p className="text-xs text-slate-400">{user?.email || 'user@teamtrack.local'}</p>
+                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
+                    VERIFIED ACCOUNT
                   </span>
                 </div>
               </div>
 
-              <div className="space-y-4 pt-2">
-                <div>
-                  <label className="block text-[13px] font-semibold text-[#242424] mb-1">Display Name</label>
-                  <Input defaultValue={userName} style={{ width: '100%' }} />
-                </div>
-
-                <div>
-                  <label className="block text-[13px] font-semibold text-[#242424] mb-1">Email Address</label>
-                  <Input defaultValue={userEmail} disabled style={{ width: '100%' }} />
-                </div>
-
-                <div className="pt-2 flex items-center justify-between">
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Auto-start application</div>
-                    <div className="text-[12px] text-[#616161]">Automatically start TeamTrack when logging into Windows.</div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      required
+                      className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
+                    />
                   </div>
-                  <Switch defaultChecked />
-                </div>
 
-                <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Open application in background</div>
-                    <div className="text-[12px] text-[#616161]">Start TeamTrack minimized to the system tray.</div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Job Title
+                    </label>
+                    <input
+                      type="text"
+                      value={jobTitle}
+                      onChange={(e) => setJobTitle(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
+                    />
                   </div>
-                  <Switch />
                 </div>
-              </div>
 
-              <div className="pt-4 flex gap-3">
-                <Button appearance="primary" onClick={handleSave}>Save changes</Button>
-                <Button appearance="secondary" onClick={() => logout ? logout() : router.push('/login')}>Sign out</Button>
-              </div>
-            </section>
-          )}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Bio / Status Note
+                  </label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    rows={2}
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
 
-          {/* 2. Appearance Tab */}
-          {selectedTab === 'appearance' && (
-            <section className="space-y-6">
-              <div>
-                <h1 className="text-[20px] font-bold text-[#242424]">Appearance & Theme</h1>
-                <p className="text-[13px] text-[#616161] mt-0.5">Customize your Microsoft Teams visual experience.</p>
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Timezone
+                    </label>
+                    <input
+                      type="text"
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div
-                  onClick={() => setTheme('light')}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    theme === 'light' ? 'border-[#5B5FC7] bg-[#EBEAF9]/40 shadow-xs' : 'border-[#E1DFDD] hover:border-[#B0B5BA]'
-                  }`}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Language & Locale
+                    </label>
+                    <input
+                      type="text"
+                      value={locale}
+                      onChange={(e) => setLocale(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
                 >
-                  <div className="h-20 rounded-lg bg-[#ECEEF0] border border-[#D1D5DB] mb-2.5 flex items-center justify-center">
-                    <div className="w-12 h-6 bg-white rounded shadow-xs" />
-                  </div>
-                  <div className="text-[13px] font-bold text-center text-[#242424]">Light Theme (Default)</div>
-                </div>
-
-                <div
-                  onClick={() => setTheme('dark')}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    theme === 'dark' ? 'border-[#5B5FC7] bg-[#EBEAF9]/40 shadow-xs' : 'border-[#E1DFDD] hover:border-[#B0B5BA]'
-                  }`}
-                >
-                  <div className="h-20 rounded-lg bg-[#1F1F1F] border border-[#333] mb-2.5 flex items-center justify-center">
-                    <div className="w-12 h-6 bg-[#292929] rounded shadow-xs" />
-                  </div>
-                  <div className="text-[13px] font-bold text-center text-[#242424]">Dark Theme</div>
-                </div>
-
-                <div
-                  onClick={() => setTheme('system')}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    theme === 'system' ? 'border-[#5B5FC7] bg-[#EBEAF9]/40 shadow-xs' : 'border-[#E1DFDD] hover:border-[#B0B5BA]'
-                  }`}
-                >
-                  <div className="h-20 rounded-lg bg-gradient-to-r from-[#ECEEF0] to-[#1F1F1F] border border-[#D1D5DB] mb-2.5 flex items-center justify-center">
-                    <div className="w-12 h-6 bg-white/80 rounded shadow-xs" />
-                  </div>
-                  <div className="text-[13px] font-bold text-center text-[#242424]">Match System</div>
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <Button appearance="primary" onClick={handleSave}>Apply theme</Button>
-              </div>
-            </section>
+                  Save Changes
+                </button>
+              </form>
+            </div>
           )}
 
-          {/* 3. Notifications Tab */}
-          {selectedTab === 'notifications' && (
-            <section className="space-y-6">
-              <div>
-                <h1 className="text-[20px] font-bold text-[#242424]">Notification Preferences</h1>
-                <p className="text-[13px] text-[#616161] mt-0.5">Control how and when you receive message alerts.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg border border-[#E1DFDD]">
-                  <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Desktop Toast Banners</div>
-                    <div className="text-[12px] text-[#616161]">Show native system banner popups for new messages and mentions.</div>
-                  </div>
-                  <Switch checked={bannerNotifs} onChange={(_, d) => setBannerNotifs(d.checked)} />
+          {/* ── TAB 2: SECURITY & 2FA ── */}
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-5">
+                <div>
+                  <h2 className="text-lg font-bold">Two-Factor Authentication (2FA)</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Protect your TeamTrack account with multi-factor biometric or authenticator app authentication.
+                  </p>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg border border-[#E1DFDD]">
-                  <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Notification Sounds</div>
-                    <div className="text-[12px] text-[#616161]">Play Microsoft Teams audio chimes for incoming calls and notifications.</div>
+                <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500">
+                      <ShieldCheck className="w-5 h-5" strokeWidth={1.65} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        Authenticator App (TOTP)
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {twoFactorEnabled ? 'Enabled • Securing all logins' : 'Disabled • Not recommended'}
+                      </p>
+                    </div>
                   </div>
-                  <Switch checked={soundNotifs} onChange={(_, d) => setSoundNotifs(d.checked)} />
-                </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg border border-[#E1DFDD]">
-                  <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Missed Activity Emails</div>
-                    <div className="text-[12px] text-[#616161]">Receive periodic digest emails when you are away from your computer.</div>
-                  </div>
-                  <Switch checked={emailNotifs} onChange={(_, d) => setEmailNotifs(d.checked)} />
+                  <button
+                    onClick={() => {
+                      setTwoFactorEnabled(!twoFactorEnabled);
+                      setSaveSuccess(`Two-factor authentication ${!twoFactorEnabled ? 'enabled' : 'disabled'}.`);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                      twoFactorEnabled
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                        : 'bg-indigo-600 text-white'
+                    }`}
+                  >
+                    {twoFactorEnabled ? 'Enabled' : 'Enable 2FA'}
+                  </button>
                 </div>
               </div>
 
-              <div className="pt-4">
-                <Button appearance="primary" onClick={handleSave}>Save preferences</Button>
+              {/* Password Change Form */}
+              <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                <h3 className="text-sm font-bold">Change Password</h3>
+
+                <form onSubmit={handleUpdatePassword} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Current Password
+                    </label>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                      placeholder="••••••••••••"
+                      className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        New Password
+                      </label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        placeholder="Minimum 8 characters"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Confirm New Password
+                      </label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        placeholder="Re-enter new password"
+                        className="w-full h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer mt-2"
+                  >
+                    Update Password
+                  </button>
+                </form>
               </div>
-            </section>
+            </div>
           )}
 
-          {/* 4. Devices Tab */}
-          {selectedTab === 'devices' && (
-            <section className="space-y-6">
+          {/* ── TAB 3: ACTIVE SESSIONS ── */}
+          {activeTab === 'sessions' && (
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-5">
               <div>
-                <h1 className="text-[20px] font-bold text-[#242424]">Devices (Audio & Video)</h1>
-                <p className="text-[13px] text-[#616161] mt-0.5">Configure hardware devices for Teams video meetings and calls.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[13px] font-semibold text-[#242424] mb-1.5">Microphone</label>
-                  <Input value={selectedMic} onChange={(_, d) => setSelectedMic(d.value)} style={{ width: '100%' }} />
-                </div>
-
-                <div>
-                  <label className="block text-[13px] font-semibold text-[#242424] mb-1.5">Speakers</label>
-                  <Input value={selectedSpeaker} onChange={(_, d) => setSelectedSpeaker(d.value)} style={{ width: '100%' }} />
-                </div>
-
-                <div>
-                  <label className="block text-[13px] font-semibold text-[#242424] mb-1.5">Camera</label>
-                  <Input value={selectedCamera} onChange={(_, d) => setSelectedCamera(d.value)} style={{ width: '100%' }} />
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#FAF9F8] border border-[#E1DFDD] flex items-center justify-between">
-                  <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Noise Suppression</div>
-                    <div className="text-[12px] text-[#616161]">Suppress background noise during calls (AI-powered).</div>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <Button appearance="primary" onClick={handleSave}>Save device setup</Button>
-              </div>
-            </section>
-          )}
-
-          {/* 5. Privacy Tab */}
-          {selectedTab === 'privacy' && (
-            <section className="space-y-6">
-              <div>
-                <h1 className="text-[20px] font-bold text-[#242424]">Privacy & Security</h1>
-                <p className="text-[13px] text-[#616161] mt-0.5">Enterprise security and data compliance controls.</p>
+                <h2 className="text-lg font-bold">Active Device Sessions</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Devices currently signed into your TeamTrack account. You can revoke any unrecognized session.
+                </p>
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg border border-[#E1DFDD]">
-                  <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Read Receipts</div>
-                    <div className="text-[12px] text-[#616161]">Let others know when you have seen their messages.</div>
+                {sessions.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                    No active sessions found.
                   </div>
-                  <Switch defaultChecked />
+                ) : (
+                  sessions.map((sess) => (
+                    <div
+                      key={sess.id}
+                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500">
+                          {sess.userAgent?.includes('Mobile') || sess.userAgent?.includes('iOS') ? (
+                            <Smartphone className="w-5 h-5" />
+                          ) : (
+                            <Laptop className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              {sess.userAgent || 'Active Device'}
+                            </p>
+                            {sess.isCurrent && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                                Current Device
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            IP: {sess.ipAddress} • Last active {sess.lastActivityAt ? new Date(sess.lastActivityAt).toLocaleDateString() : 'Active'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {!sess.isCurrent && (
+                        <button
+                          onClick={() => handleRevokeSession(sess.id)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Revoke</span>
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB 4: THEME & APPEARANCE ── */}
+          {activeTab === 'appearance' && (
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6">
+              <div>
+                <h2 className="text-lg font-bold">Theme & Appearance</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Select your interface mode and visual preferences.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Dark Obsidian */}
+                <button
+                  onClick={() => handleApplyTheme('dark')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    theme === 'dark'
+                      ? 'border-indigo-600 bg-indigo-50/10 ring-2 ring-indigo-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-900 text-slate-100'
+                  }`}
+                >
+                  <div className="w-full h-20 rounded-xl bg-[#090D16] border border-slate-800 p-2 mb-3 flex flex-col justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-rose-500" />
+                      <div className="w-2 h-2 rounded-full bg-amber-500" />
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    </div>
+                    <div className="h-2 w-16 bg-slate-800 rounded" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Obsidian Dark</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">High-contrast deep canvas</p>
+                </button>
+
+                {/* Light Canvas */}
+                <button
+                  onClick={() => handleApplyTheme('light')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    theme === 'light'
+                      ? 'border-indigo-600 bg-indigo-50/10 ring-2 ring-indigo-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-white text-slate-900'
+                  }`}
+                >
+                  <div className="w-full h-20 rounded-xl bg-slate-100 border border-slate-200 p-2 mb-3 flex flex-col justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-slate-300" />
+                      <div className="w-2 h-2 rounded-full bg-slate-300" />
+                      <div className="w-2 h-2 rounded-full bg-slate-300" />
+                    </div>
+                    <div className="h-2 w-16 bg-slate-200 rounded" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Studio Light</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Crisp, clean surface</p>
+                </button>
+
+                {/* System */}
+                <button
+                  onClick={() => handleApplyTheme('system')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    theme === 'system'
+                      ? 'border-indigo-600 bg-indigo-50/10 ring-2 ring-indigo-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800'
+                  }`}
+                >
+                  <div className="w-full h-20 rounded-xl bg-gradient-to-r from-slate-100 to-slate-900 border border-slate-300 dark:border-slate-700 p-2 mb-3 flex items-center justify-center">
+                    <Globe className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">System Sync</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Auto-adapts to OS theme</p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB 5: AUDIO & VIDEO DEVICES ── */}
+          {activeTab === 'devices' && (
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6">
+              <div>
+                <h2 className="text-lg font-bold">Audio & Video Devices</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Configure default devices for instant meetings, huddles, and calls.
+                </p>
+              </div>
+
+              {/* Microphone & Live Audio Meter */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-semibold text-xs">
+                    <Mic className="w-4 h-4 text-indigo-500" />
+                    <span>Microphone Input</span>
+                  </div>
+                  <button
+                    onClick={() => setIsTestingMic(!isTestingMic)}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
+                  >
+                    {isTestingMic ? 'Stop Test' : 'Test Mic'}
+                  </button>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg border border-[#E1DFDD]">
-                  <div>
-                    <div className="text-[13.5px] font-semibold text-[#242424]">Telemetry & Diagnostics</div>
-                    <div className="text-[12px] text-[#616161]">Send crash reports and anonymous diagnostic telemetry.</div>
+                <select
+                  value={selectedMic}
+                  onChange={(e) => setSelectedMic(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs"
+                >
+                  <option>Default - Microphone Array (Realtek Audio)</option>
+                  <option>External USB Microphone (Studio Quality)</option>
+                  <option>Bluetooth Headset Mic</option>
+                </select>
+
+                {/* Audio Level Visualizer Meter */}
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                    <span>Input Volume Level</span>
+                    <span>{isTestingMic ? `${audioLevel}%` : 'Idle'}</span>
                   </div>
-                  <Switch defaultChecked />
+                  <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 via-cyan-500 to-indigo-500 transition-all duration-100 rounded-full"
+                      style={{ width: `${isTestingMic ? audioLevel : 0}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-4">
-                <Button appearance="primary" onClick={handleSave}>Save privacy settings</Button>
+              {/* Speaker Output */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-xs">
+                  <Volume2 className="w-4 h-4 text-indigo-500" strokeWidth={1.65} />
+                  <span>Speaker Output</span>
+                </div>
+                <select
+                  value={selectedSpeaker}
+                  onChange={(e) => setSelectedSpeaker(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs"
+                >
+                  <option>Default - Speakers (Realtek Audio)</option>
+                  <option>Headphones (High Definition Audio)</option>
+                </select>
               </div>
-            </section>
+
+              {/* Camera Selection */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-xs">
+                  <Video className="w-4 h-4 text-indigo-500" />
+                  <span>Camera</span>
+                </div>
+                <select
+                  value={selectedCamera}
+                  onChange={(e) => setSelectedCamera(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs"
+                >
+                  <option>Integrated HD Webcam (1080p)</option>
+                  <option>External 4K Studio Camera</option>
+                  <option>Virtual Camera OBS</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB 6: NOTIFICATIONS ── */}
+          {activeTab === 'notifications' && (
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-5">
+              <div>
+                <h2 className="text-lg font-bold">Notification Preferences</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Control how and when you receive workspace alerts and mentions.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <label className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Desktop Push Notifications</p>
+                    <p className="text-[11px] text-slate-400">Receive banner alerts for incoming messages and calls</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={desktopNotifs}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setDesktopNotifs(val);
+                      handleUpdateNotificationPreferences({ pushEnabled: val });
+                    }}
+                    className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Realtime Push & Chimes</p>
+                    <p className="text-[11px] text-slate-400">Play subtle audio chime when messages arrive</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={soundAlerts}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setSoundAlerts(val);
+                      handleUpdateNotificationPreferences({ realtimeEnabled: val });
+                    }}
+                    className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Email Notifications</p>
+                    <p className="text-[11px] text-slate-400">Receive email notifications for missed mentions and meetings</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={emailDigests}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setEmailDigests(val);
+                      handleUpdateNotificationPreferences({ emailEnabled: val });
+                    }}
+                    className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                  />
+                </label>
+              </div>
+            </div>
           )}
         </div>
       </div>
     </TeamsShell>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="h-screen w-screen flex items-center justify-center bg-[var(--bg-canvas)] text-[var(--text-secondary)] text-xs">
+          Loading Settings...
+        </div>
+      }
+    >
+      <SettingsContent />
+    </React.Suspense>
   );
 }

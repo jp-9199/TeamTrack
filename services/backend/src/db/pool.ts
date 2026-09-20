@@ -9,6 +9,13 @@ export const pool = new Pool({
   idleTimeoutMillis: config.database.idleTimeoutMs,
   connectionTimeoutMillis: config.database.connectionTimeoutMs,
   statement_timeout: config.database.statementTimeoutMs,
+  ssl:
+    config.databaseUrl?.includes('sslmode=require') ||
+    config.databaseUrl?.includes('supabase') ||
+    config.databaseUrl?.includes('neon.tech') ||
+    process.env.DATABASE_SSL === 'true'
+      ? { rejectUnauthorized: false }
+      : undefined,
 });
 
 pool.on('error', (err) => {

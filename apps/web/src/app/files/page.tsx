@@ -1,84 +1,85 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TeamsShell } from '../../components/layout/TeamsShell';
-import { Tooltip } from '@fluentui/react-components';
-import {
-  FolderRegular,
-  FolderFilled,
-  DocumentRegular,
-  DocumentPdfRegular,
-  ArrowUploadRegular,
-  ArrowDownloadRegular,
-  GridRegular,
-  ListRegular,
-  SearchRegular,
-  CloudRegular,
-  ClockRegular,
-  DeleteRegular,
-  ShareRegular,
-  EyeRegular,
-  DismissRegular,
-  CheckmarkRegular,
-  AddRegular,
-} from '@fluentui/react-icons';
 import { useAuth } from '../../components/auth/AuthContext';
+import {
+  FileBox,
+  FileCode,
+  FileText,
+  FileSpreadsheet,
+  Image,
+  Upload,
+  Download,
+  Eye,
+  LayoutGrid,
+  List,
+  Search,
+  HardDrive,
+  X,
+  Copy,
+  Check,
+} from 'lucide-react';
 
-interface CloudFile {
+interface StudioFile {
   id: string;
   name: string;
-  category: 'recent' | 'my_files' | 'teams_files' | 'downloads';
-  location: string;
-  type: 'word' | 'excel' | 'powerpoint' | 'pdf' | 'image' | 'code' | 'zip';
+  category: 'code' | 'docs' | 'sheets' | 'media' | 'general';
   sizeBytes: number;
+  uploadedBy: string;
   modifiedAt: string;
-  modifiedBy: string;
   previewContent?: string;
+  extension: string;
+  downloadUrl?: string;
 }
 
 export default function FilesHubPage() {
   const { user } = useAuth();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [previewFile, setPreviewFile] = useState<StudioFile | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [activeCategory, setActiveCategory] = useState<'recent' | 'my_files' | 'teams_files' | 'downloads'>('recent');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [previewFile, setPreviewFile] = useState<CloudFile | null>(null);
+  const [files, setFiles] = useState<StudioFile[]>([]);
 
-  // Live state without dummy data
-  const [files, setFiles] = useState<CloudFile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
+  const getAuthToken = () => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('teamtrack_access_token') || localStorage.getItem('token') || '';
+  };
 
-  // 1. Fetch real files from backend channels
-  const fetchFiles = useCallback(async () => {
+  const categorizeFile = (name: string): 'code' | 'docs' | 'sheets' | 'media' | 'general' => {
+    const ext = name.split('.').pop()?.toLowerCase() || '';
+    if (['ts', 'tsx', 'js', 'jsx', 'json', 'py', 'yml', 'yaml', 'html', 'css', 'sql'].includes(ext)) return 'code';
+    if (['pdf', 'doc', 'docx', 'txt', 'md', 'rtf'].includes(ext)) return 'docs';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'sheets';
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'mp4', 'mov'].includes(ext)) return 'media';
+    return 'general';
+  };
+
+  const loadFiles = useCallback(async () => {
     setIsLoading(true);
-    const token = localStorage.getItem('token') || 'demo-user-token';
+    const token = getAuthToken();
     try {
-      const res = await fetch('/api/v1/channels/general/files', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && data.data?.files) {
-        const mappedFiles: CloudFile[] = data.data.files.map((f: any) => {
-          let fileType: CloudFile['type'] = 'word';
-          if (f.mimeType?.includes('pdf') || f.fileName.endsWith('.pdf')) fileType = 'pdf';
-          else if (f.mimeType?.includes('sheet') || f.fileName.endsWith('.xlsx')) fileType = 'excel';
-          else if (f.mimeType?.includes('presentation') || f.fileName.endsWith('.pptx')) fileType = 'powerpoint';
-          else if (f.mimeType?.includes('image') || f.fileName.endsWith('.png')) fileType = 'image';
+      const res = await fetch('/api/v1/files', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }).then((r) => r.json());
 
-          return {
-            id: f.id,
-            name: f.fileName,
-            category: 'teams_files',
-            location: 'Teams > General',
-            type: fileType,
-            sizeBytes: f.fileSizeBytes || 0,
-            modifiedAt: new Date(f.createdAt).toLocaleDateString(),
-            modifiedBy: f.uploaderName || 'Team Member',
-          };
-        });
-        setFiles(mappedFiles);
+      if (res.success && Array.isArray(res.data?.files)) {
+        const mapped: StudioFile[] = res.data.files.map((f: any) => ({
+          id: f.id,
+          name: f.fileName,
+          category: categorizeFile(f.fileName),
+          sizeBytes: f.fileSizeBytes || 0,
+          uploadedBy: f.uploaderName || 'Team Member',
+          modifiedAt: new Date(f.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+          extension: f.fileName.split('.').pop() || 'bin',
+          downloadUrl: f.downloadUrl,
+        }));
+        setFiles(mapped);
       } else {
         setFiles([]);
       }
@@ -90,244 +91,242 @@ export default function FilesHubPage() {
   }, []);
 
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    loadFiles();
+  }, [loadFiles]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFiles = e.target.files;
     if (!uploadedFiles || uploadedFiles.length === 0) return;
-
     const file = uploadedFiles[0];
-    setIsUploading(true);
 
-    const token = localStorage.getItem('token') || 'demo-user-token';
-    const formData = new FormData();
-    formData.append('file', file);
+    setIsUploading(true);
+    const token = getAuthToken();
 
     try {
-      await fetch('/api/v1/channels/general/files', {
+      const res = await fetch('/api/v1/files/upload', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      await fetchFiles();
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSizeBytes: file.size,
+          mimeType: file.type || 'application/octet-stream',
+        }),
+      }).then((r) => r.json());
+
+      if (res.success && res.data?.file) {
+        loadFiles();
+      }
     } catch (err) {
-      console.error('File upload error:', err);
+      console.error('Failed to upload file:', err);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const getFileIcon = (type: CloudFile['type']) => {
-    switch (type) {
-      case 'pdf':
-        return <DocumentPdfRegular fontSize={24} className="text-[#D83B01]" />;
-      case 'excel':
-        return <DocumentRegular fontSize={24} className="text-[#107C10]" />;
-      case 'powerpoint':
-        return <DocumentRegular fontSize={24} className="text-[#C4314B]" />;
+  const filteredFiles = files.filter((f) => {
+    if (selectedCategory !== 'all' && f.category !== selectedCategory) return false;
+    if (searchQuery.trim() && !f.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  };
+
+  const getFileIcon = (category: string) => {
+    switch (category) {
+      case 'code':
+        return <FileCode className="w-5 h-5 text-indigo-500" strokeWidth={1.65} />;
+      case 'docs':
+        return <FileText className="w-5 h-5 text-rose-500" strokeWidth={1.65} />;
+      case 'sheets':
+        return <FileSpreadsheet className="w-5 h-5 text-emerald-500" strokeWidth={1.65} />;
+      case 'media':
+        return <Image className="w-5 h-5 text-cyan-500" strokeWidth={1.65} />;
       default:
-        return <DocumentRegular fontSize={24} className="text-[#0078D4]" />;
+        return <FileBox className="w-5 h-5 text-amber-500" strokeWidth={1.65} />;
     }
   };
 
-  const filteredFiles = files.filter((f) => {
-    if (activeCategory === 'recent' || f.category === activeCategory) {
-      if (searchQuery.trim() && !f.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      return true;
-    }
-    return false;
-  });
-
-  const storageUsedBytes = files.reduce((acc, f) => acc + f.sizeBytes, 0);
-  const storageTotalBytes = 100 * 1024 * 1024; // 100 MB free quota
-  const storagePercent = Math.min(100, Math.round((storageUsedBytes / storageTotalBytes) * 100));
-
-  // ── SECONDARY SIDEBAR: FILES NAVIGATION ──
+  // ── SECONDARY SIDEBAR: STORAGE CATEGORIES ──
   const sidebar = (
-    <div className="flex flex-col h-full bg-[#ECEEF0] select-none text-[#242424]">
-      {/* Sidebar Header */}
-      <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-        <h2 className="text-[18px] font-bold tracking-tight">Files</h2>
+    <div className="flex flex-col h-full bg-slate-50/90 dark:bg-[#0B1120]/95 text-slate-800 dark:text-slate-100 p-3 select-none border-r border-slate-200 dark:border-slate-800">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+        <div className="flex items-center gap-2">
+          <HardDrive className="w-4 h-4 text-indigo-500" />
+          <h2 className="text-sm font-bold tracking-tight">Files Hub</h2>
+        </div>
       </div>
 
-      {/* Nav Menu Items */}
-      <div className="px-2 space-y-1 mt-1">
+      {/* Categories */}
+      <div className="space-y-1">
         {[
-          { id: 'recent', label: 'Recent', icon: <ClockRegular fontSize={18} /> },
-          { id: 'my_files', label: 'My files', icon: <CloudRegular fontSize={18} /> },
-          { id: 'teams_files', label: 'Teams files', icon: <FolderRegular fontSize={18} /> },
-          { id: 'downloads', label: 'Downloads', icon: <ArrowDownloadRegular fontSize={18} /> },
-        ].map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveCategory(item.id as any)}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-semibold transition-all cursor-pointer ${
-              activeCategory === item.id
-                ? 'bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] text-[#5B5FC7] font-bold ring-1 ring-black/5'
-                : 'text-[#424242] hover:bg-black/5 hover:text-[#242424]'
-            }`}
-          >
-            <span className={activeCategory === item.id ? 'text-[#5B5FC7]' : 'text-[#616161]'}>
-              {item.icon}
-            </span>
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Cloud Storage Usage Card */}
-      <div className="mt-auto p-4 m-2 bg-white rounded-2xl border border-[#E1DFDD] shadow-xs">
-        <div className="flex items-center justify-between text-[11.5px] font-bold mb-1.5 text-[#242424]">
-          <span>Cloud Storage</span>
-          <span className="text-[#616161]">{storagePercent}% used</span>
-        </div>
-        <div className="w-full h-1.5 bg-[#F3F2F1] rounded-full overflow-hidden mb-2">
-          <div
-            className="h-full bg-[#5B5FC7] rounded-full transition-all duration-300"
-            style={{ width: `${Math.max(4, storagePercent)}%` }}
-          />
-        </div>
-        <p className="text-[11px] text-[#8A8886]">
-          {Math.round(storageUsedBytes / (1024 * 1024))} MB of 100 MB used
-        </p>
+          { id: 'all', label: 'All Files', count: files.length },
+          { id: 'code', label: 'Code & Scripts', count: files.filter((f) => f.category === 'code').length },
+          { id: 'docs', label: 'Documents & PDFs', count: files.filter((f) => f.category === 'docs').length },
+          { id: 'sheets', label: 'Sheets & Data', count: files.filter((f) => f.category === 'sheets').length },
+          { id: 'media', label: 'Media & Images', count: files.filter((f) => f.category === 'media').length },
+        ].map((cat) => {
+          const isSelected = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs ring-1 ring-slate-200 dark:ring-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
+              }`}
+            >
+              <span>{cat.label}</span>
+              <span className="text-[11px] text-slate-400 font-semibold">{cat.count}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 
   return (
     <TeamsShell sidebar={sidebar} activeApp="files">
-      {/* ── ACTIVE CANVAS: FILES HUB STAGE ── */}
-      <div className="flex flex-col h-full overflow-hidden bg-white">
-        {/* Action Header */}
-        <header className="px-8 py-4 border-b border-[#E1DFDD] bg-white flex items-center justify-between shrink-0 shadow-xs">
-          <div className="flex items-center gap-3">
-            <h1 className="text-[19px] font-bold text-[#242424] capitalize">
-              {activeCategory.replace('_', ' ')}
-            </h1>
-            <span className="text-[12px] text-[#616161] bg-[#F5F5F5] px-2 py-0.5 rounded-full font-medium">
-              {filteredFiles.length} {filteredFiles.length === 1 ? 'file' : 'files'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Search filter */}
-            <div className="relative flex items-center">
-              <SearchRegular fontSize={14} className="absolute left-2.5 text-[#616161]" />
+      <div className="flex flex-col h-full bg-slate-50/40 dark:bg-[#090D16]/40 text-slate-800 dark:text-slate-100 overflow-hidden">
+        {/* Top Control Bar */}
+        <div className="h-14 px-6 border-b border-slate-200 dark:border-slate-800/80 bg-white/70 dark:bg-[#090D16]/70 backdrop-blur-md flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 flex-1 max-w-sm">
+            <div className="relative w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.65} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search files..."
-                className="w-48 bg-white border border-[#D1D5DB] rounded-lg pl-8 pr-3 py-1.5 text-[12px] outline-none focus:border-[#5B5FC7] placeholder-[#707070]"
+                placeholder="Filter files by filename..."
+                className="w-full h-9 pl-9 pr-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:outline-none focus:border-indigo-500"
               />
             </div>
+          </div>
 
+          <div className="flex items-center gap-2">
             {/* View Mode Toggle */}
-            <div className="flex items-center bg-[#F5F5F5] p-0.5 rounded-lg border border-[#E1DFDD]">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-all cursor-pointer ${
-                  viewMode === 'list' ? 'bg-white shadow-xs text-[#242424]' : 'text-[#616161]'
-                }`}
-                title="List view"
-              >
-                <ListRegular fontSize={16} />
-              </button>
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded transition-all cursor-pointer ${
-                  viewMode === 'grid' ? 'bg-white shadow-xs text-[#242424]' : 'text-[#616161]'
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-400'
                 }`}
                 title="Grid view"
               >
-                <GridRegular fontSize={16} />
+                <LayoutGrid className="w-4 h-4" strokeWidth={1.65} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-400'
+                }`}
+                title="List view"
+              >
+                <List className="w-4 h-4" strokeWidth={1.65} />
               </button>
             </div>
+
+            {/* Hidden Input for Real Upload */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleUpload}
+              className="hidden"
+            />
 
             {/* Upload Button */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="px-3.5 py-1.5 bg-[#5B5FC7] text-white rounded-lg text-[12.5px] font-semibold hover:bg-[#4F52B2] transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
             >
-              <ArrowUploadRegular fontSize={16} />
-              {isUploading ? 'Uploading...' : 'Upload'}
+              <Upload className="w-4 h-4" strokeWidth={1.65} />
+              <span>{isUploading ? 'Uploading...' : 'Upload File'}</span>
             </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden"
-            />
           </div>
-        </header>
+        </div>
 
         {/* Files Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 bg-[#FAF9F8]">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           {isLoading ? (
-            <div className="py-16 text-center text-[#616161] text-[13px]">Loading files...</div>
+            <div className="py-20 text-center text-slate-400 text-xs">Loading files...</div>
           ) : filteredFiles.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-[#616161] bg-white rounded-2xl border border-[#E1DFDD]">
-              <div className="w-16 h-16 rounded-full bg-[#EBEAF9] text-[#5B5FC7] flex items-center justify-center mb-3">
-                <FolderRegular fontSize={32} />
-              </div>
-              <h3 className="text-[18px] font-bold text-[#242424]">No files found</h3>
-              <p className="text-[13px] text-[#707070] mt-1 max-w-sm">
-                Upload documents, spreadsheets, or presentations to share and collaborate with your team.
-              </p>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="mt-4 px-4 py-2 bg-[#5B5FC7] text-white text-[12.5px] font-semibold rounded-lg hover:bg-[#4F52B2] shadow-xs cursor-pointer flex items-center gap-1.5"
-              >
-                <ArrowUploadRegular fontSize={16} />
-                Upload a file
-              </button>
+            <div className="py-16 text-center max-w-sm mx-auto">
+              <FileBox className="w-10 h-10 text-slate-300 dark:text-slate-700 mx-auto mb-2" strokeWidth={1.5} />
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No files uploaded</p>
+              <p className="text-xs text-slate-400 mt-1">Upload files or documents to share them across your workspace.</p>
             </div>
-          ) : viewMode === 'list' ? (
-            /* LIST VIEW */
-            <div className="bg-white rounded-2xl border border-[#E1DFDD] overflow-hidden shadow-xs">
-              <table className="w-full text-left border-collapse text-[13px]">
+          ) : viewMode === 'grid' ? (
+            /* Grid View */
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredFiles.map((file) => (
+                <div
+                  key={file.id}
+                  onClick={() => setPreviewFile(file)}
+                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500/40 hover:shadow-md hover:scale-[1.01] transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800">
+                        {getFileIcon(file.category)}
+                      </div>
+                      <span className="text-[10px] uppercase font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                        {file.extension}
+                      </span>
+                    </div>
+
+                    <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {file.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {formatFileSize(file.sizeBytes)} • {file.modifiedAt}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-400">
+                    <span className="truncate text-[11px]">{file.uploadedBy}</span>
+                    <Eye className="w-3.5 h-3.5 group-hover:text-indigo-500 transition-colors" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* List View */
+            <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#E1DFDD] bg-[#FAF9F8] text-[#616161] font-semibold">
-                    <th className="py-3 px-6">Name</th>
-                    <th className="py-3 px-4">Location</th>
-                    <th className="py-3 px-4">Modified</th>
-                    <th className="py-3 px-4">Modified By</th>
-                    <th className="py-3 px-4">Size</th>
-                    <th className="py-3 px-6 text-right">Actions</th>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
+                    <th className="p-3.5 font-semibold">File Name</th>
+                    <th className="p-3.5 font-semibold">Author</th>
+                    <th className="p-3.5 font-semibold">Size</th>
+                    <th className="p-3.5 font-semibold">Modified</th>
+                    <th className="p-3.5 font-semibold text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {filteredFiles.map((file) => (
                     <tr
                       key={file.id}
-                      className="border-b border-[#F3F2F1] hover:bg-black/5 transition-colors group cursor-pointer"
                       onClick={() => setPreviewFile(file)}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-6 font-semibold text-[#242424] flex items-center gap-3">
-                        {getFileIcon(file.type)}
-                        <span className="truncate max-w-sm">{file.name}</span>
+                      <td className="p-3.5 flex items-center gap-3">
+                        {getFileIcon(file.category)}
+                        <span className="font-semibold text-slate-900 dark:text-slate-100">{file.name}</span>
                       </td>
-                      <td className="py-3 px-4 text-[#616161]">{file.location}</td>
-                      <td className="py-3 px-4 text-[#616161]">{file.modifiedAt}</td>
-                      <td className="py-3 px-4 text-[#424242]">{file.modifiedBy}</td>
-                      <td className="py-3 px-4 text-[#616161]">
-                        {Math.round(file.sizeBytes / 1024)} KB
-                      </td>
-                      <td className="py-3 px-6 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreviewFile(file);
-                          }}
-                          className="p-1.5 hover:bg-[#5B5FC7]/10 text-[#5B5FC7] rounded-lg transition-colors mr-1"
-                          title="Preview"
-                        >
-                          <EyeRegular fontSize={16} />
+                      <td className="p-3.5 text-slate-400">{file.uploadedBy}</td>
+                      <td className="p-3.5 text-slate-400 font-mono">{formatFileSize(file.sizeBytes)}</td>
+                      <td className="p-3.5 text-slate-400">{file.modifiedAt}</td>
+                      <td className="p-3.5 text-right">
+                        <button className="p-1 rounded-lg text-slate-400 hover:text-indigo-500">
+                          <Eye className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -335,75 +334,70 @@ export default function FilesHubPage() {
                 </tbody>
               </table>
             </div>
-          ) : (
-            /* GRID VIEW */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredFiles.map((file) => (
-                <div
-                  key={file.id}
-                  onClick={() => setPreviewFile(file)}
-                  className="bg-white p-4 rounded-2xl border border-[#E1DFDD] shadow-xs hover:shadow-md hover:border-[#5B5FC7]/40 transition-all cursor-pointer flex flex-col justify-between h-44"
-                >
-                  <div className="flex items-start justify-between">
-                    {getFileIcon(file.type)}
-                  </div>
-
-                  <div>
-                    <h4 className="text-[13px] font-bold text-[#242424] truncate">{file.name}</h4>
-                    <p className="text-[11px] text-[#8A8886] mt-0.5">{file.location}</p>
-                  </div>
-
-                  <div className="pt-2 border-t border-[#F3F2F1] flex items-center justify-between text-[11px] text-[#616161]">
-                    <span>{Math.round(file.sizeBytes / 1024)} KB</span>
-                    <span>{file.modifiedAt}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
         </div>
-      </div>
 
-      {/* ── FILE PREVIEW MODAL ── */}
-      {previewFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl border border-[#E1DFDD] w-[600px] overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="px-6 py-4 border-b border-[#E1DFDD] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5 truncate pr-4">
-                {getFileIcon(previewFile.type)}
-                <h3 className="text-[15px] font-bold text-[#242424] truncate">{previewFile.name}</h3>
-              </div>
-              <button
-                onClick={() => setPreviewFile(null)}
-                className="p-1 text-[#616161] hover:text-[#242424] rounded-md cursor-pointer"
-              >
-                <DismissRegular fontSize={18} />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto flex-1 bg-[#FAF9F8]">
-              <div className="bg-white p-6 rounded-xl border border-[#E1DFDD] shadow-xs">
-                <h4 className="text-[14px] font-bold text-[#242424] mb-2">{previewFile.name}</h4>
-                <div className="space-y-1.5 text-[12px] text-[#616161] mb-4">
-                  <p>Location: <strong className="text-[#242424]">{previewFile.location}</strong></p>
-                  <p>Modified: <strong className="text-[#242424]">{previewFile.modifiedAt}</strong></p>
-                  <p>Modified by: <strong className="text-[#242424]">{previewFile.modifiedBy}</strong></p>
-                  <p>File Size: <strong className="text-[#242424]">{Math.round(previewFile.sizeBytes / 1024)} KB</strong></p>
+        {/* ── FILE DETAILS MODAL ── */}
+        {previewFile && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            onClick={() => setPreviewFile(null)}
+          >
+            <div
+              className="w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-slate-800 dark:text-slate-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  {getFileIcon(previewFile.category)}
+                  <div>
+                    <h3 className="text-sm font-bold">{previewFile.name}</h3>
+                    <p className="text-[11px] text-slate-400">
+                      {formatFileSize(previewFile.sizeBytes)} • Uploaded by {previewFile.uploadedBy}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="px-6 py-3 border-t border-[#E1DFDD] bg-white flex items-center justify-end shrink-0">
-              <button
-                onClick={() => setPreviewFile(null)}
-                className="px-4 py-1.5 bg-[#5B5FC7] text-white text-[12.5px] font-semibold rounded-lg hover:bg-[#4F52B2] cursor-pointer"
-              >
-                Close
-              </button>
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 font-mono text-xs leading-relaxed bg-slate-50 dark:bg-[#0B1120] text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
+                <div>File ID: {previewFile.id}</div>
+                <div>Size: {formatFileSize(previewFile.sizeBytes)}</div>
+                <div>Uploaded on: {previewFile.modifiedAt}</div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2 text-xs">
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                >
+                  Close
+                </button>
+                {previewFile.downloadUrl && (
+                  <a
+                    href={previewFile.downloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </a>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </TeamsShell>
   );
 }

@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && npm run build:packages && cd apps/web && npm run build",
+  "outputDirectory": ".next"
+}

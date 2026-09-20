@@ -10,6 +10,7 @@
     "pack:asar": "tsc && node scripts/update-asar.mjs",
     "test": "tsx --test tests/**/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "package:exe": "node scripts/package-win.mjs",
     "package:win": "electron-builder --win -c electron-builder.json"
   },
   "devDependencies": {

@@ -3,42 +3,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamsShell } from '../../components/layout/TeamsShell';
-import {
-  Tooltip,
-  Button,
-  Input,
-  Avatar,
-  Badge,
-  Dialog,
-  DialogSurface,
-  DialogTitle,
-  DialogBody,
-  DialogContent,
-  DialogActions,
-  TabList,
-  Tab,
-} from '@fluentui/react-components';
-import {
-  VideoRegular,
-  VideoFilled,
-  AddRegular,
-  ClockRegular,
-  PeopleRegular,
-  SearchRegular,
-  DismissRegular,
-  ShareRegular,
-  LinkRegular,
-  CheckmarkRegular,
-  CalendarRegular,
-} from '@fluentui/react-icons';
 import { useAuth } from '../../components/auth/AuthContext';
 import { api } from '../../lib/api';
 import type { MeetingWithHost } from '@teamtrack/shared-types';
+import {
+  Video,
+  Plus,
+  Clock,
+  Users,
+  Search,
+  Share2,
+  KeyRound,
+  Check,
+  CalendarDays,
+  Sparkles,
+  X,
+  ShieldCheck,
+  Radio,
+} from 'lucide-react';
 
 export default function MeetingsPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const userName = user?.displayName || 'Amir Asad Ullah Khan';
+  const userName = user?.displayName || 'Workspace Member';
   const orgId = (user as any)?.organizationId || (user as any)?.activeOrganizationId || 'org_default';
 
   // ── State Management ──
@@ -85,12 +72,6 @@ export default function MeetingsPage() {
     fetchMeetings();
   }, [fetchMeetings]);
 
-  // Handle Instant Meeting Launch
-  const handleStartInstantMeeting = () => {
-    const roomId = `meet-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
-    router.push(`/meetings/room/${roomId}`);
-  };
-
   // Open Meet Now Dialog with generated room ID
   const handleOpenMeetNow = () => {
     const roomId = `meet-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
@@ -124,7 +105,6 @@ export default function MeetingsPage() {
     setIsSubmitting(true);
     try {
       const startDateTime = new Date(`${scheduleDate}T${scheduleTime}:00`);
-      const endDateTime = new Date(startDateTime.getTime() + 45 * 60 * 1000);
 
       const res = await api.createMeeting({
         organizationId: orgId,
@@ -150,65 +130,90 @@ export default function MeetingsPage() {
     m.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ── Render Secondary Sidebar (Pane 2) ──
+  // ── Render Secondary Sidebar ──
   const renderSidebar = () => (
-    <div className="flex flex-col h-full bg-[#ECEEF0] select-none font-sans">
+    <div className="flex flex-col h-full bg-[var(--bg-surface)] select-none font-sans text-[var(--text-primary)] border-r border-[var(--border-subtle)]">
       {/* Sidebar Header */}
-      <div className="p-4 border-b border-[#E1DFDD]/70">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[17px] font-bold text-[#242424] tracking-tight">Meet</h2>
+      <div className="p-4 border-b border-[var(--border-subtle)] space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold tracking-tight">Meetings &amp; Rooms</h2>
+        </div>
+
+        {/* Free Pro Pill */}
+        <div className="p-2 rounded-xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-indigo-400 font-semibold text-[11px]">
+            <Sparkles size={12} />
+            <span>4K Video Rooms</span>
+          </div>
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 uppercase">
+            Free
+          </span>
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="flex items-center gap-2 mb-3">
-          <Button
-            appearance="primary"
-            icon={<VideoRegular fontSize={18} />}
+        <div className="grid grid-cols-2 gap-2">
+          <button
             onClick={handleOpenMeetNow}
-            className="flex-1 text-[13px] font-medium"
+            className="py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
           >
-            Meet now
-          </Button>
-          <Button
-            appearance="secondary"
-            icon={<AddRegular fontSize={18} />}
+            <Video size={14} />
+            <span>Meet Now</span>
+          </button>
+          <button
             onClick={() => setIsScheduleOpen(true)}
-            className="flex-1 text-[13px] font-medium"
+            className="py-2 px-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
-            New meeting
-          </Button>
+            <Plus size={14} />
+            <span>Schedule</span>
+          </button>
         </div>
 
         {/* Search Box */}
-        <Input
-          value={searchQuery}
-          onChange={(_, data) => setSearchQuery(data.value)}
-          contentBefore={<SearchRegular fontSize={15} className="text-[#616161]" />}
-          placeholder="Search meetings..."
-          className="w-full"
-          size="small"
-        />
+        <div className="relative flex items-center">
+          <span className="absolute left-3 text-[var(--text-secondary)] pointer-events-none">
+            <Search size={13} />
+          </span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search meetings..."
+            className="w-full h-8 pl-8 pr-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-indigo-500"
+          />
+        </div>
       </div>
 
       {/* Tabs: Upcoming / Past */}
-      <div className="px-3 pt-2 border-b border-[#E1DFDD]/60">
-        <TabList
-          selectedValue={activeTab}
-          onTabSelect={(_, data) => setActiveTab(data.value as 'upcoming' | 'past')}
-          size="small"
+      <div className="px-3 pt-2 border-b border-[var(--border-subtle)] flex items-center gap-2 text-xs">
+        <button
+          onClick={() => setActiveTab('upcoming')}
+          className={`pb-2 border-b-2 font-semibold transition-colors cursor-pointer ${
+            activeTab === 'upcoming'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
         >
-          <Tab value="upcoming">Upcoming</Tab>
-          <Tab value="past">History</Tab>
-        </TabList>
+          Upcoming
+        </button>
+        <button
+          onClick={() => setActiveTab('past')}
+          className={`pb-2 border-b-2 font-semibold transition-colors cursor-pointer ${
+            activeTab === 'past'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          History
+        </button>
       </div>
 
       {/* Meeting List or Empty State */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
         {filteredMeetings.length === 0 ? (
-          <div className="text-center py-10 px-4 text-[#616161]">
-            <ClockRegular fontSize={28} className="mx-auto text-[#8A8886] mb-2" />
-            <p className="text-[13px] font-semibold text-[#242424]">No meetings yet</p>
-            <p className="text-[11.5px] text-[#616161] mt-0.5">
+          <div className="text-center py-10 px-4 text-[var(--text-secondary)]">
+            <Clock size={24} className="mx-auto text-[var(--text-secondary)] mb-2" />
+            <p className="text-xs font-semibold text-[var(--text-primary)]">No meetings found</p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
               Start an instant meeting or schedule one to connect.
             </p>
           </div>
@@ -217,22 +222,20 @@ export default function MeetingsPage() {
             <div
               key={meeting.id}
               onClick={() => router.push(`/meetings/room/${meeting.id}`)}
-              className="p-2.5 rounded-lg bg-white border border-[#E1DFDD]/60 hover:border-[#5B5FC7] hover:shadow-xs transition-all cursor-pointer group"
+              className="p-2.5 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] hover:border-indigo-500/40 hover:shadow-xs transition-all cursor-pointer group"
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[13px] font-semibold text-[#242424] truncate group-hover:text-[#5B5FC7]">
+                <span className="text-xs font-semibold text-[var(--text-primary)] truncate group-hover:text-indigo-400">
                   {meeting.title}
                 </span>
-                <Badge
-                  appearance="tint"
-                  color={meeting.status === 'active' ? 'danger' : 'informative'}
-                  size="small"
-                >
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                  meeting.status === 'active' ? 'bg-rose-500/10 text-rose-400' : 'bg-indigo-500/10 text-indigo-400'
+                }`}>
                   {meeting.status}
-                </Badge>
+                </span>
               </div>
-              <div className="flex items-center gap-2 text-[11px] text-[#616161]">
-                <ClockRegular fontSize={13} />
+              <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+                <Clock size={12} />
                 <span>
                   {meeting.scheduledStartAt
                     ? new Date(meeting.scheduledStartAt).toLocaleTimeString([], {
@@ -248,164 +251,160 @@ export default function MeetingsPage() {
       </div>
 
       {/* Join with ID Button at Bottom */}
-      <div className="p-3 border-t border-[#E1DFDD]/70 bg-[#F5F5F5]">
-        <Button
-          appearance="subtle"
-          icon={<LinkRegular fontSize={16} />}
+      <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)]">
+        <button
           onClick={() => setIsJoinWithIdOpen(true)}
-          className="w-full text-[12.5px] justify-start"
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
         >
-          Join with a meeting ID
-        </Button>
+          <KeyRound size={14} strokeWidth={1.65} />
+          <span>Join with Meeting ID</span>
+        </button>
       </div>
     </div>
   );
 
   return (
     <TeamsShell activeApp="meet" sidebar={renderSidebar()}>
-      <div className="flex-1 flex flex-col h-full bg-[#FAF9F8] overflow-y-auto font-sans">
+      <div className="flex-1 flex flex-col h-full bg-[var(--bg-canvas)] overflow-y-auto font-sans text-[var(--text-primary)]">
         {/* ── Top Hero Canvas ── */}
         <div className="p-8 max-w-[1000px] w-full mx-auto">
-          <div className="mb-6">
-            <h1 className="text-[24px] font-bold text-[#242424] tracking-tight">Meet</h1>
-            <p className="text-[14px] text-[#616161] mt-1">
-              Start an instant meeting, schedule for later, or join an existing call.
-            </p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight">Studio Meetings</h1>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                  Unlimited Free Tier
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                Zero time limits, crystal-clear 4K screen sharing, and encrypted drop-in video rooms.
+              </p>
+            </div>
           </div>
 
-          {/* ── 3 Core Teams Action Cards ── */}
+          {/* ── 3 Core Action Cards ── */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {/* Card 1: Meet now */}
-            <div className="bg-white p-5 rounded-xl border border-[#E1DFDD] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+            <div className="bg-[var(--bg-surface)] p-5 rounded-2xl border border-[var(--border-subtle)] shadow-xs hover:shadow-lg transition-all flex flex-col justify-between group">
               <div>
-                <div className="w-[42px] h-[42px] rounded-lg bg-[#5B5FC7]/10 flex items-center justify-center text-[#5B5FC7] mb-3">
-                  <VideoFilled fontSize={24} />
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-105 transition-transform">
+                  <Video size={20} strokeWidth={1.65} />
                 </div>
-                <h3 className="text-[15px] font-bold text-[#242424]">Meet now</h3>
-                <p className="text-[12.5px] text-[#616161] mt-1 leading-relaxed">
-                  Start an instant video meeting and invite anyone with a secure link.
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Meet Now</h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                  Start an instant video room with a shareable secure link. No logins required for guests.
                 </p>
               </div>
               <div className="pt-4 mt-auto">
-                <Button
-                  appearance="primary"
-                  icon={<VideoRegular fontSize={17} />}
+                <button
                   onClick={handleOpenMeetNow}
-                  className="w-full"
+                  className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer shadow-sm"
                 >
-                  Start meeting
-                </Button>
+                  Start Instant Room
+                </button>
               </div>
             </div>
 
             {/* Card 2: Join with an ID */}
-            <div className="bg-white p-5 rounded-xl border border-[#E1DFDD] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+            <div className="bg-[var(--bg-surface)] p-5 rounded-2xl border border-[var(--border-subtle)] shadow-xs hover:shadow-lg transition-all flex flex-col justify-between group">
               <div>
-                <div className="w-[42px] h-[42px] rounded-lg bg-[#0078D4]/10 flex items-center justify-center text-[#0078D4] mb-3">
-                  <LinkRegular fontSize={24} />
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-105 transition-transform">
+                  <KeyRound size={20} strokeWidth={1.65} />
                 </div>
-                <h3 className="text-[15px] font-bold text-[#242424]">Join with an ID</h3>
-                <p className="text-[12.5px] text-[#616161] mt-1 leading-relaxed">
-                  Have a meeting code or invitation link? Enter it to join immediately.
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Join with an ID</h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                  Enter a room code or paste an invite link to jump directly into an ongoing session.
                 </p>
               </div>
               <div className="pt-4 mt-auto">
-                <Button
-                  appearance="secondary"
-                  icon={<LinkRegular fontSize={17} />}
+                <button
                   onClick={() => setIsJoinWithIdOpen(true)}
-                  className="w-full"
+                  className="w-full py-2 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
                 >
-                  Join meeting
-                </Button>
+                  Enter Room Code
+                </button>
               </div>
             </div>
 
             {/* Card 3: Schedule a meeting */}
-            <div className="bg-white p-5 rounded-xl border border-[#E1DFDD] shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between">
+            <div className="bg-[var(--bg-surface)] p-5 rounded-2xl border border-[var(--border-subtle)] shadow-xs hover:shadow-lg transition-all flex flex-col justify-between group">
               <div>
-                <div className="w-[42px] h-[42px] rounded-lg bg-[#107C41]/10 flex items-center justify-center text-[#107C41] mb-3">
-                  <CalendarRegular fontSize={24} />
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-105 transition-transform">
+                  <CalendarDays size={20} strokeWidth={1.65} />
                 </div>
-                <h3 className="text-[15px] font-bold text-[#242424]">Schedule a meeting</h3>
-                <p className="text-[12.5px] text-[#616161] mt-1 leading-relaxed">
-                  Plan ahead with calendar invites, recurring schedules, and waiting room protection.
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Schedule Meeting</h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                  Plan ahead with calendar sync, recurring sessions, and customizable waiting room options.
                 </p>
               </div>
               <div className="pt-4 mt-auto">
-                <Button
-                  appearance="secondary"
-                  icon={<AddRegular fontSize={17} />}
+                <button
                   onClick={() => setIsScheduleOpen(true)}
-                  className="w-full"
+                  className="w-full py-2 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
                 >
-                  Schedule
-                </Button>
+                  Schedule for Later
+                </button>
               </div>
             </div>
           </div>
 
           {/* ── Upcoming Meetings Section ── */}
-          <div className="bg-white rounded-xl border border-[#E1DFDD] shadow-xs p-6">
+          <div className="bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] shadow-xs p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-[16px] font-bold text-[#242424]">Scheduled Meetings</h2>
-                <p className="text-[12px] text-[#616161]">
-                  Upcoming calls and team syncs connected to your calendar
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">Scheduled Sessions</h2>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Upcoming calls and reviews synced with your team calendar
                 </p>
               </div>
-              <Button
-                appearance="subtle"
-                icon={<AddRegular fontSize={16} />}
+              <button
                 onClick={() => setIsScheduleOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
               >
-                Schedule new
-              </Button>
+                <Plus size={14} />
+                <span>Schedule New</span>
+              </button>
             </div>
 
             {filteredMeetings.length === 0 ? (
-              <div className="text-center py-12 px-4 border border-dashed border-[#E1DFDD] rounded-lg">
-                <VideoRegular fontSize={40} className="mx-auto text-[#A19F9D] mb-3" />
-                <h3 className="text-[15px] font-semibold text-[#242424]">No upcoming meetings</h3>
-                <p className="text-[13px] text-[#616161] max-w-[380px] mx-auto mt-1 mb-4 leading-relaxed">
-                  You have a clean schedule. Start a quick call with your team or plan a future discussion.
+              <div className="text-center py-12 px-4 border border-dashed border-[var(--border-subtle)] rounded-xl">
+                <Video size={36} className="mx-auto text-[var(--text-secondary)] mb-3" />
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">No upcoming sessions</h3>
+                <p className="text-xs text-[var(--text-secondary)] max-w-[380px] mx-auto mt-1 mb-4 leading-relaxed">
+                  Your schedule is clear. Drop into an instant meeting or schedule one for your teammates.
                 </p>
-                <div className="flex items-center justify-center gap-3">
-                  <Button
-                    appearance="primary"
-                    icon={<VideoRegular fontSize={17} />}
+                <div className="flex items-center justify-center gap-2.5">
+                  <button
                     onClick={handleOpenMeetNow}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-sm"
                   >
-                    Meet now
-                  </Button>
-                  <Button
-                    appearance="secondary"
-                    icon={<CalendarRegular fontSize={17} />}
+                    Meet Now
+                  </button>
+                  <button
                     onClick={() => setIsScheduleOpen(true)}
+                    className="px-4 py-2 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] cursor-pointer"
                   >
-                    Schedule a meeting
-                  </Button>
+                    Schedule Meeting
+                  </button>
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-[#EDEBE9]">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {filteredMeetings.map((meeting) => (
                   <div
                     key={meeting.id}
-                    className="py-3.5 flex items-center justify-between hover:bg-[#F9F8F7] px-2 rounded-lg transition-colors"
+                    className="py-3.5 flex items-center justify-between hover:bg-[var(--border-subtle)]/30 px-2 rounded-xl transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <Avatar
-                        name={meeting.host?.displayName || 'Host'}
-                        size={36}
-                        color="colorful"
-                      />
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {(meeting.host?.displayName || 'H').charAt(0).toUpperCase()}
+                      </div>
                       <div className="min-w-0">
-                        <p className="text-[13.5px] font-semibold text-[#242424] truncate">
+                        <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
                           {meeting.title}
                         </p>
-                        <p className="text-[12px] text-[#616161]">
-                          Hosted by {meeting.host?.displayName || userName} ·{' '}
+                        <p className="text-[11px] text-[var(--text-secondary)]">
+                          Hosted by {meeting.host?.displayName || userName} &bull;{' '}
                           {meeting.scheduledStartAt
                             ? new Date(meeting.scheduledStartAt).toLocaleString([], {
                                 dateStyle: 'short',
@@ -416,14 +415,12 @@ export default function MeetingsPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        appearance="primary"
-                        onClick={() => router.push(`/meetings/room/${meeting.id}`)}
-                      >
-                        Join
-                      </Button>
-                    </div>
+                    <button
+                      onClick={() => router.push(`/meetings/room/${meeting.id}`)}
+                      className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-sm"
+                    >
+                      Join
+                    </button>
                   </div>
                 ))}
               </div>
@@ -433,29 +430,38 @@ export default function MeetingsPage() {
       </div>
 
       {/* ── 1. Meet Now Modal Dialog ── */}
-      <Dialog open={isMeetNowOpen} onOpenChange={(_, data) => setIsMeetNowOpen(data.open)}>
-        <DialogSurface className="max-w-[460px] p-6 rounded-2xl font-sans">
-          <DialogTitle className="text-[18px] font-bold text-[#242424]">
-            Start instant meeting
-          </DialogTitle>
-          <DialogBody>
-            <DialogContent className="py-3 space-y-4">
+      {isMeetNowOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <Video size={18} className="text-indigo-400" />
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Start Instant Meeting</h3>
+              </div>
+              <button
+                onClick={() => setIsMeetNowOpen(false)}
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4 text-xs">
               <div>
-                <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
-                  Meeting title
+                <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                  Meeting Title
                 </label>
-                <Input
+                <input
                   value={meetNowTitle}
-                  onChange={(_, data) => setMeetNowTitle(data.value)}
-                  className="w-full"
-                  placeholder="Meeting title"
+                  onChange={(e) => setMeetNowTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               {/* Shareable Link Box */}
-              <div className="p-3 bg-[#F5F5F5] rounded-lg border border-[#EDEBE9]">
-                <label className="block text-[11.5px] font-semibold text-[#616161] mb-1">
-                  Share this link with others:
+              <div className="p-3 bg-[var(--bg-canvas)] rounded-xl border border-[var(--border-subtle)]">
+                <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                  Share this invitation link with others:
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -466,157 +472,196 @@ export default function MeetingsPage() {
                         ? `${window.location.origin}/meetings/room/${generatedMeetingId}`
                         : `http://localhost:3000/meetings/room/${generatedMeetingId}`
                     }
-                    className="flex-1 text-[12px] bg-white border border-[#E1DFDD] rounded px-2.5 py-1.5 text-[#242424] select-all outline-none"
+                    className="flex-1 text-[11px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-[var(--text-primary)] select-all outline-none"
                   />
-                  <Button
-                    appearance={copiedLink ? 'primary' : 'secondary'}
-                    icon={copiedLink ? <CheckmarkRegular fontSize={16} /> : <ShareRegular fontSize={16} />}
+                  <button
                     onClick={handleCopyLink}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    {copiedLink ? 'Copied' : 'Copy'}
-                  </Button>
+                    {copiedLink ? <Check size={13} /> : <Share2 size={13} />}
+                    <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                  </button>
                 </div>
               </div>
-            </DialogContent>
-            <DialogActions className="pt-3 flex justify-end gap-2">
-              <Button appearance="secondary" onClick={() => setIsMeetNowOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                appearance="primary"
-                icon={<VideoRegular fontSize={16} />}
-                onClick={() => router.push(`/meetings/room/${generatedMeetingId}`)}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle)] mt-4">
+              <button
+                onClick={() => setIsMeetNowOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs text-[var(--text-secondary)] cursor-pointer"
               >
-                Start meeting
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </DialogSurface>
-      </Dialog>
+                Cancel
+              </button>
+              <button
+                onClick={() => router.push(`/meetings/room/${generatedMeetingId}`)}
+                className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-sm"
+              >
+                Join Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 2. Join with ID Modal Dialog ── */}
-      <Dialog open={isJoinWithIdOpen} onOpenChange={(_, data) => setIsJoinWithIdOpen(data.open)}>
-        <DialogSurface className="max-w-[420px] p-6 rounded-2xl font-sans">
-          <DialogTitle className="text-[18px] font-bold text-[#242424]">
-            Join with a meeting ID
-          </DialogTitle>
-          <form onSubmit={handleJoinWithId}>
-            <DialogBody>
-              <DialogContent className="py-3 space-y-3">
-                <div>
-                  <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
-                    Meeting ID or Link
-                  </label>
-                  <Input
-                    value={joinMeetingId}
-                    onChange={(_, data) => setJoinMeetingId(data.value)}
-                    placeholder="e.g. meet-abc-123 or paste room URL"
-                    className="w-full"
-                    autoFocus
-                  />
-                </div>
-                <div>
-                  <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
-                    Passcode (Optional)
-                  </label>
-                  <Input
-                    type="password"
-                    value={joinPasscode}
-                    onChange={(_, data) => setJoinPasscode(data.value)}
-                    placeholder="Enter passcode if required"
-                    className="w-full"
-                  />
-                </div>
-              </DialogContent>
-              <DialogActions className="pt-3 flex justify-end gap-2">
-                <Button appearance="secondary" onClick={() => setIsJoinWithIdOpen(false)}>
+      {isJoinWithIdOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <KeyRound size={18} className="text-indigo-400" strokeWidth={1.65} />
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Join with Meeting ID</h3>
+              </div>
+              <button
+                onClick={() => setIsJoinWithIdOpen(false)}
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg"
+              >
+                <X size={16} strokeWidth={1.65} />
+              </button>
+            </div>
+
+            <form onSubmit={handleJoinWithId} className="mt-4 space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                  Meeting ID or Room URL
+                </label>
+                <input
+                  value={joinMeetingId}
+                  onChange={(e) => setJoinMeetingId(e.target.value)}
+                  placeholder="e.g. meet-abc-123 or paste full room link"
+                  className="w-full px-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                  Passcode (Optional)
+                </label>
+                <input
+                  type="password"
+                  value={joinPasscode}
+                  onChange={(e) => setJoinPasscode(e.target.value)}
+                  placeholder="Enter passcode if protected"
+                  className="w-full px-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
+                <button
+                  type="button"
+                  onClick={() => setIsJoinWithIdOpen(false)}
+                  className="px-3.5 py-1.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs text-[var(--text-secondary)] cursor-pointer"
+                >
                   Cancel
-                </Button>
-                <Button appearance="primary" type="submit" disabled={!joinMeetingId.trim()}>
-                  Join
-                </Button>
-              </DialogActions>
-            </DialogBody>
-          </form>
-        </DialogSurface>
-      </Dialog>
+                </button>
+                <button
+                  type="submit"
+                  disabled={!joinMeetingId.trim()}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  Join Room
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── 3. Schedule Meeting Modal Dialog ── */}
-      <Dialog open={isScheduleOpen} onOpenChange={(_, data) => setIsScheduleOpen(data.open)}>
-        <DialogSurface className="max-w-[460px] p-6 rounded-2xl font-sans">
-          <DialogTitle className="text-[18px] font-bold text-[#242424]">
-            Schedule a meeting
-          </DialogTitle>
-          <form onSubmit={handleScheduleSubmit}>
-            <DialogBody>
-              <DialogContent className="py-3 space-y-3.5">
+      {isScheduleOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={18} className="text-indigo-400" strokeWidth={1.65} />
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Schedule Meeting</h3>
+              </div>
+              <button
+                onClick={() => setIsScheduleOpen(false)}
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleScheduleSubmit} className="mt-4 space-y-3.5 text-xs">
+              <div>
+                <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                  Title
+                </label>
+                <input
+                  value={scheduleTitle}
+                  onChange={(e) => setScheduleTitle(e.target.value)}
+                  placeholder="e.g. Design Sprint / Product Review"
+                  className="w-full px-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-indigo-500"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
-                    Title
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                    Date
                   </label>
-                  <Input
-                    value={scheduleTitle}
-                    onChange={(_, data) => setScheduleTitle(data.value)}
-                    placeholder="e.g. Design Sprint / Project Sync"
-                    className="w-full"
-                    autoFocus
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)]"
+                    required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
-                      Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={scheduleDate}
-                      onChange={(_, data) => setScheduleDate(data.value)}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[12.5px] font-semibold text-[#242424] mb-1">
-                      Start Time
-                    </label>
-                    <Input
-                      type="time"
-                      value={scheduleTime}
-                      onChange={(_, data) => setScheduleTime(data.value)}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={waitingRoomEnabled}
-                      onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
-                      className="w-4 h-4 text-[#5B5FC7] rounded"
-                    />
-                    <span className="text-[13px] text-[#242424]">
-                      Enable waiting room for guests
-                    </span>
+                <div>
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                    Start Time
                   </label>
+                  <input
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-xs text-[var(--text-primary)]"
+                    required
+                  />
                 </div>
-              </DialogContent>
-              <DialogActions className="pt-3 flex justify-end gap-2">
-                <Button appearance="secondary" onClick={() => setIsScheduleOpen(false)}>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={waitingRoomEnabled}
+                    onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 rounded"
+                  />
+                  <span className="text-xs text-[var(--text-primary)]">
+                    Enable secure guest lobby / waiting room
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-subtle)]">
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleOpen(false)}
+                  className="px-3.5 py-1.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--border-subtle)] text-xs text-[var(--text-secondary)] cursor-pointer"
+                >
                   Cancel
-                </Button>
-                <Button
-                  appearance="primary"
+                </button>
+                <button
                   type="submit"
                   disabled={!scheduleTitle.trim() || isSubmitting}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-sm"
                 >
                   {isSubmitting ? 'Scheduling...' : 'Save & Schedule'}
-                </Button>
-              </DialogActions>
-            </DialogBody>
-          </form>
-        </DialogSurface>
-      </Dialog>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </TeamsShell>
   );
 }

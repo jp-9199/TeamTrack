@@ -1,0 +1,18 @@
+{
+  "name": "TeamTrack Enterprise",
+  "short_name": "TeamTrack",
+  "description": "TeamTrack & Microsoft Teams Modern Workspace",
+  "start_url": "/chat",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8F9FA",
+  "theme_color": "#5B5FC7",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='48' fill='%235B5FC7'/><path d='M50 140C30 125 25 95 35 70C45 45 75 30 100 40C110 44 118 50 125 56' stroke='%2338BDF8' stroke-width='12' stroke-linecap='round' fill='none'/><path d='M120 135L145 110L120 85' stroke='%2338BDF8' stroke-width='12' stroke-linecap='round' stroke-linejoin='round' fill='none'/><text x='96' y='125' font-size='84' font-weight='800' font-family='sans-serif' text-anchor='middle' fill='white'>T</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

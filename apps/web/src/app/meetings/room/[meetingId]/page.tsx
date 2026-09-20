@@ -88,14 +88,14 @@ interface DeviceOption {
   label: string;
 }
 
-export default function MeetingRoomPage() {
+function MeetingRoomContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
   const meetingId = (params?.meetingId as string) || 'general-meeting';
 
-  const userName = user?.displayName || 'Amir Asad Ullah Khan';
+  const userName = user?.displayName || user?.email?.split('@')[0] || 'User';
 
   // ── 1. State Machine: Lobby vs Admitted ──
   const initialJoined = searchParams?.get('joined') === 'true';
@@ -146,22 +146,13 @@ export default function MeetingRoomPage() {
   const [copiedLink, setCopiedLink] = useState(false);
 
   // ── 3. IN-MEETING SHARED GROUP CHAT ──
-  // All participants in the meeting see messages in real-time
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: 'm-welcome',
-      author: 'Sarah Jenkins',
-      time: 'Just now',
-      text: 'Welcome everyone! Let us review the sprint goals for today.',
-      avatarBg: '#0078D4',
-    },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newChatText, setNewChatText] = useState('');
 
-  // ── 4. PARTICIPANTS IN THIS MEETING (Connected) ──
+  // ── 4. PARTICIPANTS IN THIS MEETING ──
   const [participants, setParticipants] = useState<Participant[]>([
     {
-      id: 'p-self',
+      id: user?.id || 'p-self',
       name: `${userName} (You)`,
       role: 'Organizer',
       isHost: true,
@@ -171,77 +162,38 @@ export default function MeetingRoomPage() {
       handRaised: false,
       isSpeaking: false,
     },
-    {
-      id: 'p-2',
-      name: 'Sarah Jenkins',
-      role: 'Presenter',
-      isHost: false,
-      avatarBg: '#0078D4',
-      audioMuted: false,
-      videoOff: false,
-      handRaised: false,
-      isSpeaking: true,
-    },
-    {
-      id: 'p-3',
-      name: 'Alex Rivera',
-      role: 'Attendee',
-      isHost: false,
-      avatarBg: '#107C41',
-      audioMuted: true,
-      videoOff: false,
-      handRaised: false,
-      isSpeaking: false,
-    },
-    {
-      id: 'p-4',
-      name: 'Elena Rostova',
-      role: 'Attendee',
-      isHost: false,
-      avatarBg: '#D13438',
-      audioMuted: true,
-      videoOff: true,
-      handRaised: false,
-      isSpeaking: false,
-    },
   ]);
 
-  // ── 5. OTHERS IN GROUP / SUGGESTED TO INVITE ──
-  // Members of the team/group not in the call yet. Can be searched and "Requested to join"!
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([
-    {
-      id: 'gm-1',
-      name: 'David Kim',
-      email: 'david.kim@teamtrack.local',
-      role: 'Software Engineer',
-      avatarBg: '#8B5CF6',
-      calling: false,
-    },
-    {
-      id: 'gm-2',
-      name: 'Sophia Chen',
-      email: 'sophia.chen@teamtrack.local',
-      role: 'Product Manager',
-      avatarBg: '#EC4899',
-      calling: false,
-    },
-    {
-      id: 'gm-3',
-      name: 'Michael Brown',
-      email: 'michael.b@teamtrack.local',
-      role: 'DevOps Lead',
-      avatarBg: '#F59E0B',
-      calling: false,
-    },
-    {
-      id: 'gm-4',
-      name: 'Zaid Malik',
-      email: 'zaid.m@teamtrack.local',
-      role: 'UX Designer',
-      avatarBg: '#10B981',
-      calling: false,
-    },
-  ]);
+  // ── 5. OTHERS IN WORKSPACE TO INVITE ──
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+
+  useEffect(() => {
+    async function loadWorkspaceUsers() {
+      try {
+        const token = localStorage.getItem('teamtrack_access_token') || localStorage.getItem('token') || '';
+        const res = await fetch('/api/v1/users/search?q=', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }).then((r) => r.json());
+        if (res.success && Array.isArray(res.data?.users)) {
+          const colors = ['#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#0078D4', '#D13438'];
+          const members: GroupMember[] = res.data.users
+            .filter((u: any) => u.id !== user?.id)
+            .map((u: any, idx: number) => ({
+              id: u.id,
+              name: u.displayName || u.email.split('@')[0],
+              email: u.email,
+              role: u.role || 'Teammate',
+              avatarBg: colors[idx % colors.length],
+              calling: false,
+            }));
+          setGroupMembers(members);
+        }
+      } catch (err) {
+        console.warn('Could not load directory members:', err);
+      }
+    }
+    loadWorkspaceUsers();
+  }, [user]);
 
   // People drawer search query
   const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
@@ -377,48 +329,71 @@ export default function MeetingRoomPage() {
     if (meetingState !== 'admitted') return;
 
     let ws: WebSocket | null = null;
-    try {
-      const wsBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/^http/, 'ws');
-      ws = new WebSocket(`${wsBaseUrl}/ws`, ['teamtrack-ws', 'tt-ticket.demo-ticket']);
-      wsRef.current = ws;
+    let isMounted = true;
 
-      ws.onopen = () => {
-        ws?.send(JSON.stringify({ type: 'subscribe', topic: `meeting:${meetingId}` }));
-      };
+    async function connectWs() {
+      try {
+        const token = localStorage.getItem('teamtrack_access_token') || localStorage.getItem('token') || '';
+        let ticket = 'demo-ticket';
+        if (token) {
+          try {
+            const ticketRes = await fetch('/api/v1/auth/ws-ticket', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+            }).then((r) => r.json());
+            if (ticketRes.success && ticketRes.data?.ticket) {
+              ticket = ticketRes.data.ticket;
+            }
+          } catch {}
+        }
 
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'meeting.chat' && payload.data) {
-            setChatMessages((prev) => [...prev, payload.data]);
-          } else if (payload.type === 'meeting.reaction' && payload.data?.emoji) {
-            triggerVisualReaction(payload.data.emoji);
-          } else if (payload.type === 'meeting.participant.joined' && payload.data?.user) {
-            const newUser = payload.data.user;
-            setParticipants((prev) => {
-              if (prev.some((p) => p.id === newUser.id)) return prev;
-              return [
-                ...prev,
-                {
-                  id: newUser.id,
-                  name: newUser.name,
-                  role: newUser.role || 'Attendee',
-                  avatarBg: newUser.avatarBg || '#0078D4',
-                  audioMuted: false,
-                  videoOff: false,
-                  handRaised: false,
-                  isSpeaking: false,
-                },
-              ];
-            });
-          }
-        } catch {}
-      };
-    } catch (err) {
-      console.warn('WS signaling offline, operating in self-contained mode', err);
+        if (!isMounted) return;
+
+        const wsBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/^http/, 'ws');
+        ws = new WebSocket(`${wsBaseUrl}/ws`, ['teamtrack-ws', `tt-ticket.${ticket}`]);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          ws?.send(JSON.stringify({ type: 'subscribe', topic: `meeting:${meetingId}` }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'meeting.chat' && payload.data) {
+              setChatMessages((prev) => [...prev, payload.data]);
+            } else if (payload.type === 'meeting.reaction' && payload.data?.emoji) {
+              triggerVisualReaction(payload.data.emoji);
+            } else if (payload.type === 'meeting.participant.joined' && payload.data?.user) {
+              const newUser = payload.data.user;
+              setParticipants((prev) => {
+                if (prev.some((p) => p.id === newUser.id)) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: newUser.id,
+                    name: newUser.name,
+                    role: newUser.role || 'Attendee',
+                    avatarBg: newUser.avatarBg || '#0078D4',
+                    audioMuted: false,
+                    videoOff: false,
+                    handRaised: false,
+                    isSpeaking: false,
+                  },
+                ];
+              });
+            }
+          } catch {}
+        };
+      } catch (err) {
+        console.warn('WS signaling offline, operating in self-contained mode', err);
+      }
     }
 
+    connectWs();
+
     return () => {
+      isMounted = false;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
@@ -1725,5 +1700,19 @@ export default function MeetingRoomPage() {
         </DialogSurface>
       </Dialog>
     </div>
+  );
+}
+
+export default function MeetingRoomPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="h-screen w-screen flex items-center justify-center bg-[#201F1E] text-white text-xs">
+          Loading Meeting Room...
+        </div>
+      }
+    >
+      <MeetingRoomContent />
+    </React.Suspense>
   );
 }
