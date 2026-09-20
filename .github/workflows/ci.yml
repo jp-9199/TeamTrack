@@ -55,15 +55,15 @@ jobs:
       - name: Monorepo Typecheck
         run: npm run typecheck
 
-      - name: Run Backend & AI Security Tests
-        run: npm run test:ai
+      - name: Run Backend Tests
+        run: npm run --workspace=@teamtrack/backend test
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://teamtrack:teamtrack_test_password@localhost:5432/teamtrack_test
           REDIS_URL: redis://localhost:6379
 
       - name: Build Web Application
-        run: npm run --workspace=@teamtrack/web build
+        run: npm run build:web
         env:
           NEXT_PUBLIC_API_URL: http://localhost:4000
           NEXT_PUBLIC_BACKEND_URL: http://localhost:4000

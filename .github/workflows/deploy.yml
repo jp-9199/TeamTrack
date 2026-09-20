@@ -8,7 +8,7 @@ jobs:
   deploy-production:
     name: Deploy to Cloud Server
     runs-on: ubuntu-latest
-    # Only run deployment after CI passes
+    if: ${{ secrets.PROD_SERVER_HOST != '' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
