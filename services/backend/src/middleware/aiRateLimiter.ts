@@ -31,6 +31,10 @@ if (config.redis.url) {
   }
 }
 
+export function __setRedisConnectedForTesting(connected: boolean): void {
+  isRedisConnected = connected;
+}
+
 // In-memory sliding window for development/testing
 interface UserRateLimitState {
   timestamps: number[];

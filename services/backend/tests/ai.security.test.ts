@@ -22,7 +22,7 @@ import { calendarService } from '../src/modules/calendar/calendar.service.js';
 import { meetingService } from '../src/modules/meetings/meeting.service.js';
 import { notificationService } from '../src/modules/notifications/notification.service.js';
 import { searchService } from '../src/modules/search/search.service.js';
-import { aiRateLimiter, resetInMemoryRateLimits } from '../src/middleware/aiRateLimiter.js';
+import { aiRateLimiter, resetInMemoryRateLimits, __setRedisConnectedForTesting } from '../src/middleware/aiRateLimiter.js';
 import { config } from '../src/config/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -794,6 +794,7 @@ describe('Phase 12: AI Assistant & AI Workspace Security Audit & Test Suite', ()
   it('Scenario AY: Redis failure in production mode fails closed with 503', async () => {
     const prevProd = config.isProduction;
     (config as any).isProduction = true;
+    __setRedisConnectedForTesting(false);
 
     try {
       const mockReq: any = { user: { id: 'prod-user' }, headers: {} };
@@ -816,6 +817,7 @@ describe('Phase 12: AI Assistant & AI Workspace Security Audit & Test Suite', ()
       assert.strictEqual(jsonBody?.error?.code, 'AI_RATE_LIMITED');
     } finally {
       (config as any).isProduction = prevProd;
+      __setRedisConnectedForTesting(true);
     }
   });
 
