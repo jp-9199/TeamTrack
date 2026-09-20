@@ -10,6 +10,13 @@ let combined = `-- =============================================================
 -- TeamTrack Complete Consolidated Database Schema for Supabase / Cloud Postgres
 -- ==========================================================================
 
+-- Reset public schema cleanly to prevent relation conflicts
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+COMMENT ON SCHEMA public IS 'standard public schema';
+
 -- Enable Required Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
